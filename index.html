@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caleb Messiah Tech - Home</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick-theme.css">
+    <style>
+        /* Unchanged styles */
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #90CAF9;
+            color: #0D47A1;
+            position: relative;
+            overflow-x: hidden;
+            transition: filter 0.5s ease;
+        }
+        .navbar {
+            background-color: #000000;
+            position: relative;
+            overflow: hidden;
+        }
+        .navbar video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            opacity: 0.5;
+        }
+        .navbar .navbar-brand,
+        .navbar .nav-link,
+        .navbar .cart-icon a {
+            position: relative;
+            z-index: 1;
+        }
+        .navbar-brand img {
+            height: 80px;
+        }
+        .nav-link {
+            color: #fff !important;
+        }
+        .cart-icon a {
+            color: #9bfbcb;
+            font-size: 1.5rem;
+        }
+        .cart-icon span {
+            background: red;
+            color: white;
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 0.8rem;
+        }
+        .navbar-toggler {
+            border: none;
+            padding: 0.25rem 0.75rem;
+        }
+        .navbar-toggler-icon {
+            background-image: none;
+            width: 1.5em;
+            height: 1.5em;
+            position: relative;
+        }
+        .navbar-toggler-icon::before,
+        .navbar-toggler-icon::after {
+            content: '';
+            position: absolute;
+            width: 25px;
+            height: 3px;
+            background-color: #9bfbcb;
+            transition: all 0.3s;
+            left: 0;
+        }
+        .navbar-toggler-icon::before {
+            top: 0;
+            transform: translateY(7px);
+        }
+        .navbar-toggler-icon::after {
+            bottom: 0;
+            transform: translateY(-7px);
+        }
+        .navbar-toggler[aria-expanded="true"] .navbar-toggler-icon::before {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+        .navbar-toggler[aria-expanded="true"] .navbar-toggler-icon::after {
+            transform: rotate(-45deg) translate(5px, -5px);
+        }
+        .hero-section {
+            background: linear-gradient(135deg, #42A5F5, #90CAF9);
+            color: #fff;
+            padding: 100px 0;
+            text-align: center;
+        }
+        .hero-section h1 {
+            font-size: 3rem;
+            font-weight: 700;
+        }
+        .hero-section p {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+        .btn-primary {
+            background-color: #42A5F5;
+            border: none;
+            padding: 10px 30px;
+            transition: background 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #0D47A1;
+        }
+        .services-section, .about-section, .faqs-section, .testimonial-slider {
+            padding: 60px 0;
+        }
+        .service-card {
+            background-color: #E1F5FE;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .service-card i {
+            font-size: 2.5rem;
+            color: #42A5F5;
+            margin-bottom: 15px;
+        }
+        .testimonial-slider {
+            background-color: #fff;
+            position: relative;
+        }
+        .testimonial {
+            text-align: center;
+            padding: 20px;
+        }
+        .testimonial img {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            display: block;
+        }
+        .rating {
+            color: #FFD700;
+            font-size: 1.2rem;
+        }
+        .accordion-button {
+            background-color: #E1F5FE;
+            color: #1976D2;
+            font-weight: 600;
+        }
+        .accordion-button:not(.collapsed) {
+            background-color: #42A5F5;
+            color: #fff;
+        }
+        .accordion-body {
+            background-color: #E1F5FE;
+        }
+        .cta-section {
+            background-color: #1976D2;
+            color: #fff;
+            padding: 40px 0;
+            text-align: center;
+        }
+        .footer {
+            background-color: #000000;
+            color: #fff;
+            padding: 20px 0;
+        }
+        .footer a {
+            color: #42A5F5;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            color: #9bfbcb;
+        }
+        .whatsapp-icon {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .whatsapp-icon a {
+            color: #25D366;
+            font-size: 3rem;
+        }
+        .loader {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100%;
+            background: transparent;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+        .loader.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .loader-active body {
+            filter: blur(5px);
+        }
+        #lottie-animation {
+            width: 200px;
+            height: 200px;
+        }
+        .testimonial-slider .slick-prev, .testimonial-slider .slick-next {
+            display: none !important;
+        }
+        .testimonial-slider .slick-dots {
+            text-align: center;
+            margin-top: 20px;
+        }
+        @media (max-width: 768px) {
+            .hero-section {
+                padding: 60px 0;
+            }
+            .hero-section h1 {
+                font-size: 2rem;
+            }
+            .services-section, .about-section, .faqs-section, .testimonial-slider {
+                padding: 40px 0;
+            }
+            #lottie-animation {
+                width: 150px;
+                height: 150px;
+            }
+            .testimonial img {
+                width: 100px;
+                height: 100px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loader" class="loader">
+        <div id="lottie-animation"></div>
+    </div>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <video autoplay muted loop>
+                <source src="video.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            <a class="navbar-brand" href="index.html"><img src="logo.png" alt="Caleb Messiah Logo"></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="products.html">Shop</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#services">Services</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#about">About Us</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#faqs">FAQs</a></li>
+                    <li class="nav-item"><a class="nav-link" href="repair.html">Repair</a></li>
+                    <!-- NEW: Admin Dashboard link (hidden by default) -->
+                    <li class="nav-item d-none" id="adminLink"><a class="nav-link" href="admin.html">Admin Dashboard</a></li>
+                    <!-- NEW: Login/Logout link -->
+                    <li class="nav-item" id="authLink"><a class="nav-link" href="login.html">Login</a></li>
+                    <li class="nav-item cart-icon">
+                        <a href="cart.html"><i class="fas fa-shopping-cart"></i><span id="cartCount">0</span></a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Unchanged sections -->
+    <section class="hero-section">
+        <div class="container">
+            <h1>Welcome to Caleb Messiah Tech</h1>
+            <p>Your one-stop solution for tech repairs, accessories, and services.</p>
+            <a href="products.html" class="btn btn-primary">Shop Now</a>
+            <a href="repair.html" class="btn btn-outline-light ms-2">Book a Repair</a>
+        </div>
+    </section>
+
+    <section id="services" class="services-section">
+        <div class="container">
+            <h2 class="text-center mb-4" style="color: #1976D2;">Our Services</h2>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="service-card">
+                        <i class="fas fa-mobile-alt"></i>
+                        <h4>Phone Repairs</h4>
+                        <p>Expert repairs for iPhones, Samsung, and more.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="service-card">
+                        <i class="fas fa-laptop"></i>
+                        <h4>Laptop Repairs</h4>
+                        <p>Fixes for MacBooks and other laptops.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="service-card">
+                        <i class="fas fa-headphones"></i>
+                        <h4>Accessories</h4>
+                        <p>High-quality chargers, cases, and more.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="about" class="about-section">
+        <div class="container">
+            <h2 class="text-center mb-4" style="color: #1976D2;">About Us</h2>
+            <div class="row">
+                <div class="col-md-6">
+                    <p>Caleb Messiah Tech is dedicated to providing top-notch tech repair services and quality products. With years of experience, our team ensures your devices are in safe hands.</p>
+                    <p>We pride ourselves on customer satisfaction, fast turnaround times, and competitive pricing.</p>
+                </div>
+                <div class="col-md-6">
+                    <img src="about-image.jpg" alt="About Us" class="img-fluid rounded">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="testimonial-slider">
+        <div class="container">
+            <h2 class="text-center mb-4" style="color: #0D47A1;">What Our Customers Say</h2>
+            <div class="testimonial-slider-container">
+                <div class="testimonial">
+                    <img src="male1.jpg" alt="Customer 1">
+                    <p>"Amazing service! Fixed my iPhone in no time."</p>
+                    <div class="rating"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                    <p class="text-muted">— John D.</p>
+                </div>
+                <div class="testimonial">
+                    <img src="female1.jpg" alt="Customer 2">
+                    <p>"Great prices on MacBooks, highly recommend!"</p>
+                    <div class="rating"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star-half-alt"></i></div>
+                    <p class="text-muted">— Sarah K.</p>
+                </div>
+                <div class="testimonial">
+                    <img src="male2.jpg" alt="Customer 3">
+                    <p>"Fast repair and excellent support."</p>
+                    <div class="rating"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                    <p class="text-muted">— Michael T.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="faqs" class="faqs-section" style="background-color: #fff;">
+        <div class="container">
+            <h2 class="text-center mb-4" style="color: #0D47A1;">FAQs</h2>
+            <div class="accordion" id="faqAccordion">
+                <!-- Unchanged FAQ items -->
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingOne">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                            How long does a repair take?
+                        </button>
+                    </h2>
+                    <div id="collapseOne" class="accordion-collapse collapse show" aria-labelledby="headingOne" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Simple repairs can be completed on the same day, while complex repairs may take longer (10-20 days).
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingTwo">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                            Can CalebMessiah® technicians only repair cell phones or can they repair other electronic devices as well?
+                        </button>
+                    </h2>
+                    <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            At CalebMessiah®, we repair cell phones on a daily basis. In addition, we also build websites and host training. Each location is capable of handling all sorts of electronic repairs including laptops, tablets & gaming systems. We specialize in: iPad repair, iPod repair, Xbox repair, Playstation repair, Wii repair, iPhone repair, Samsung repair, HTC repair, Laptop repair, Blackberry repair, & so much more!
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingThree">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                            What does the repair estimate include?
+                        </button>
+                    </h2>
+                    <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            The repair price estimate includes both replacement parts and labor.
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingFour">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFour" aria-expanded="false" aria-controls="collapseFour">
+                            Why is my phone slower after updating to the newest version of software?
+                        </button>
+                    </h2>
+                    <div id="collapseFour" class="accordion-collapse collapse" aria-labelledby="headingFour" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Older devices have been known to slow down if a recent software update has been installed because the phone’s hardware is not equipped to support the new features of the operating system.
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingFive">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFive" aria-expanded="false" aria-controls="collapseFive">
+                            What should I do if I drop my phone in water?
+                        </button>
+                    </h2>
+                    <div id="collapseFive" class="accordion-collapse collapse" aria-labelledby="headingFive" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            After you’ve removed your device from the liquid, dry the outside of the phone being careful to not press any buttons. If possible, remove the battery to decrease the likelihood of a short. Bring your liquid damaged item to CalebMessiah® and we will gladly take over from there!
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingSix">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSix" aria-expanded="false" aria-controls="collapseSix">
+                            Can CalebMessiah® backup data on my device?
+                        </button>
+                    </h2>
+                    <div id="collapseSix" class="accordion-collapse collapse" aria-labelledby="headingSix" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Yes! If you want to backup data stored on your device, you have come to the right place! CalebMessiah® technicians provide data backup, data recovery, and data transfer services to ensure you don’t lose any of it.
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingSeven">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSeven" aria-expanded="false" aria-controls="collapseSeven">
+                            When should a phone's battery be replaced?
+                        </button>
+                    </h2>
+                    <div id="collapseSeven" class="accordion-collapse collapse" aria-labelledby="headingSeven" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            The typical cell phone battery begins to deteriorate after 400 charging cycles. The average user will reach this point after 1-2 years of regular usage.
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingEight">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseEight" aria-expanded="false" aria-controls="collapseEight">
+                            What is the success rate of water damage repair?
+                        </button>
+                    </h2>
+                    <div id="collapseEight" class="accordion-collapse collapse" aria-labelledby="headingEight" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Typically we have a water damage repair success rate of 75% percent, though nothing is guaranteed to work and there is no warranty included.
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingNine">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNine" aria-expanded="false" aria-controls="collapseNine">
+                            Found a repair for cheaper. Why should I choose CalebMessiah®?
+                        </button>
+                    </h2>
+                    <div id="collapseNine" class="accordion-collapse collapse" aria-labelledby="headingNine" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            While there’s always someone who can fix your device for cheap, beware of prices that seem too good to be true. A cheap repair from the other guys often involves subpar replacement parts, further damaged devices, and more repairs needed in the long run. At CalebMessiah, we believe in using top-quality parts and upholding the highest standards to ensure we get every repair right. Our repairs are trustworthy—we use professional-grade replacement parts, provide lifetime warranties, and are always there to help with any future issues.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-section">
+        <div class="container">
+            <h3>Ready to Get Started?</h3>
+            <p>Contact us today for repairs, purchases, or inquiries.</p>
+            <a href="repair.html" class="btn btn-light">Book a Repair</a>
+            <a href="products.html" class="btn btn-outline-light ms-2">Explore Products</a>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4">
+                    <h5>Company</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="#about">About Us</a></li>
+                        <li><a href="#faqs">FAQs</a></li>
+                        <li><a href="#services">Services</a></li>
+                        <li><a href="location.html">Location</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h5>Menu</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="products.html">Shop</a></li>
+                        <li><a href="#services">Services</a></li>
+                        <li><a href="repair.html">Repair</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h5>Socials</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="#"><i class="fab fa-instagram"></i> Instagram</a></li>
+                        <li><a href="#"><i class="fab fa-twitter"></i> Twitter</a></li>
+                        <li><a href="#"><i class="fab fa-facebook"></i> Facebook</a></li>
+                        <li><a href="#"><i class="fab fa-linkedin"></i> LinkedIn</a></li>
+                    </ul>
+                </div>
+            </div>
+            <p class="text-center mt-3">© 2025 Caleb Messiah Tech. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <div class="whatsapp-icon">
+        <a href="https://wa.me/2347045566048?text=Hello%20Caleb%20Messiah%2C%20I%20was%20directed%20from%20your%20website.%20I%20want%20____%26%26_______" target="_blank"><i class="fab fa-whatsapp"></i></a>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.7.4/lottie.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Add loader-active class to body
+            $('body').addClass('loader-active');
+
+            // Initialize Lottie animation
+            const animation = lottie.loadAnimation({
+                container: document.getElementById('lottie-animation'),
+                renderer: 'svg',
+                loop: true,
+                autoplay: true,
+                animationData: {
+                    "v": "5.0.1",
+                    "fr": 10,
+                    "ip": 0,
+                    "op": 20,
+                    "w": 800,
+                    "h": 600,
+                    "ddd": 0,
+                    "assets": [],
+                    "layers": [
+                        {
+                            "ind": 3,
+                            "nm": "Layer 3",
+                            "ks": {
+                                "p": {
+                                    "a": 1,
+                                    "k": [
+                                        {"t": 0, "s": [456.419, 423.252, 0], "to": [-161.825, -53.536, 0], "ti": [-62.867, 94.219, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [371.703, 167.513, 0]},
+                                        {"t": 10, "s": [371.703, 167.513, 0], "to": [0, 0, 0], "ti": [0, 0, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [456.419, 423.252, 0]},
+                                        {"t": 20, "s": [456.419, 423.252, 0]}
+                                    ]
+                                },
+                                "a": {"a": 0, "k": [-24.5, -24.5, 0]},
+                                "s": {"a": 0, "k": [100, 100, 100]},
+                                "r": {"a": 0, "k": -43.065},
+                                "o": {"a": 0, "k": 100}
+                            },
+                            "ao": 0,
+                            "ip": 0,
+                            "op": 20,
+                            "st": 0,
+                            "bm": 3,
+                            "sr": 1,
+                            "ty": 4,
+                            "shapes": [
+                                {
+                                    "ty": "gr",
+                                    "it": [
+                                        {"d": 1, "ty": "el", "s": {"a": 0, "k": [210.919, 210.919]}, "p": {"a": 0, "k": [0, 0]}},
+                                        {"ty": "fl", "c": {"a": 0, "k": [0, 0.7765, 1, 1]}, "hd": false, "o": {"a": 0, "k": 100}, "r": 1},
+                                        {"ty": "tr", "p": {"a": 0, "k": [0, 0]}, "a": {"a": 0, "k": [0, 0]}, "s": {"a": 0, "k": [100, 100]}, "r": {"a": 0, "k": 0}, "o": {"a": 0, "k": 100}, "sk": {"a": 0, "k": 0}, "sa": {"a": 0, "k": 0}}
+                                    ],
+                                    "nm": "Object",
+                                    "hd": false
+                                }
+                            ]
+                        },
+                        {
+                            "ind": 2,
+                            "nm": "Layer 2",
+                            "ks": {
+                                "p": {
+                                    "a": 1,
+                                    "k": [
+                                        {"t": 0, "s": [361.777, 165.918, 0], "to": [0, 0, 0], "ti": [0, 0, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [214.784, 406.838, 0]},
+                                        {"t": 10, "s": [214.784, 406.838, 0], "to": [-83.035, -34.503, 0], "ti": [0, 0, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [361.777, 165.918, 0]},
+                                        {"t": 20, "s": [361.777, 165.918, 0]}
+                                    ]
+                                },
+                                "a": {"a": 0, "k": [-66.5, -66.5, 0]},
+                                "s": {"a": 0, "k": [100, 100, 100]},
+                                "r": {"a": 0, "k": -43.065},
+                                "o": {"a": 0, "k": 100}
+                            },
+                            "ao": 0,
+                            "ip": 0,
+                            "op": 20,
+                            "st": 0,
+                            "bm": 3,
+                            "sr": 1,
+                            "ty": 4,
+                            "shapes": [
+                                {
+                                    "ty": "gr",
+                                    "it": [
+                                        {"d": 1, "ty": "el", "s": {"a": 0, "k": [236, 236]}, "p": {"a": 0, "k": [0, 0]}},
+                                        {"ty": "fl", "c": {"a": 0, "k": [0, 0.1686, 0.1686, 1]}, "hd": false, "o": {"a": 0, "k": 100}, "r": 1},
+                                        {"ty": "tr", "p": {"a": 0, "k": [0, 0]}, "a": {"a": 0, "k": [0, 0]}, "s": {"a": 0, "k": [100, 100]}, "r": {"a": 0, "k": 0}, "o": {"a": 0, "k": 100}, "sk": {"a": 0, "k": 0}, "sa": {"a": 0, "k": 0}}
+                                    ],
+                                    "nm": "Object",
+                                    "hd": false
+                                }
+                            ]
+                        },
+                        {
+                            "ind": 1,
+                            "nm": "Layer 1",
+                            "ks": {
+                                "p": {
+                                    "a": 1,
+                                    "k": [
+                                        {"t": 0, "s": [263.776, 342.564, 0], "to": [0, 0, 0], "ti": [0, 0, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [545.716, 355.446, 0]},
+                                        {"t": 10, "s": [545.716, 355.446, 0], "to": [-7.345, 74.699, 0], "ti": [0, 0, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [263.776, 342.564, 0]},
+                                        {"t": 20, "s": [263.776, 342.564, 0]}
+                                    ]
+                                },
+                                "a": {"a": 0, "k": [0, 0, 0]},
+                                "s": {"a": 0, "k": [100, 100, 100]},
+                                "r": {"a": 0, "k": -43.065},
+                                "o": {"a": 0, "k": 100}
+                            },
+                            "ao": 0,
+                            "ip": 0,
+                            "op": 20,
+                            "st": 0,
+                            "bm": 3,
+                            "sr": 1,
+                            "ty": 4,
+                            "shapes": [
+                                {
+                                    "ty": "gr",
+                                    "it": [
+                                        {"d": 1, "ty": "el", "s": {"a": 0, "k": [150.135, 150.135]}, "p": {"a": 0, "k": [0, 0]}},
+                                        {"ty": "fl", "c": {"a": 0, "k": [0.1804, 0.0118, 0.898, 1]}, "hd": false, "o": {"a": 0, "k": 100}, "r": 1},
+                                        {"ty": "tr", "p": {"a": 0, "k": [0, 0]}, "a": {"a": 0, "k": [0, 0]}, "s": {"a": 0, "k": [100, 100]}, "r": {"a": 0, "k": 0}, "o": {"a": 0, "k": 100}, "sk": {"a": 0, "k": 0}, "sa": {"a": 0, "k": 0}}
+                                    ],
+                                    "nm": "Object",
+                                    "hd": false
+                                }
+                            ]
+                        }
+                    ],
+                    "markers": []
+                }
+            });
+
+            // Hide loader and remove blur after 2 seconds
+            setTimeout(() => {
+                $('#loader').addClass('hidden');
+                $('body').removeClass('loader-active');
+            }, 2000);
+
+            // Initialize testimonial slider
+            $('.testimonial-slider-container').slick({
+                infinite: true,
+                slidesToShow: 1,
+                slidesToScroll: 1,
+                autoplay: true,
+                autoplaySpeed: 3000,
+                arrows: false,
+                dots: true
+            });
+
+            // Update cart count
+            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+            let cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+            $('#cartCount').text(cartCount);
+
+            // NEW: Check user auth and role
+            const token = localStorage.getItem('token');
+            if (token) {
+                $.ajax({
+                    url: '/api/auth/profile',
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    success: function(user) {
+                        $('#authLink').html('<a class="nav-link" href="#" id="logout">Logout</a>');
+                        if (user.role === 'admin') {
+                            $('#adminLink').removeClass('d-none');
+                        }
+                    },
+                    error: function() {
+                        $('#authLink').html('<a class="nav-link" href="login.html">Login</a>');
+                    }
+                });
+            }
+
+            // NEW: Handle logout
+            $(document).on('click', '#logout', function(e) {
+                e.preventDefault();
+                localStorage.removeItem('token');
+                window.location.href = 'index.html';
+            });
+        });
+    </script>
+</body>
+</html>
