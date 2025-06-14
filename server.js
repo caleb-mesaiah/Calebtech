@@ -11,7 +11,12 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'))); // Serve login.html, etc.
 
-// MongoDB User Schema
+// Root Route
+app.get('/', (req, res) => {
+  res.redirect('/login.html'); // Fix Cannot GET /
+});
+
+// User Schema
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -62,8 +67,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     user.resetPasswordToken = token;
     user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
     await user.save();
-    // Log reset token (replace with email service like Nodemailer in production)
-    console.log(`Reset token for ${email}: ${token}`);
+    console.log(`Reset token for ${email}: ${token}`); // Replace with Nodemailer later
     res.json({ message: 'Password reset link sent (check console for token)' });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
