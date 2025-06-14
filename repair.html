@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repair Service - Caleb Messiah Tech</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #90CAF9;
+            color: #0D47A1;
+            position: relative;
+            overflow-x: hidden;
+            transition: filter 0.5s ease;
+        }
+        .loader-active body {
+            filter: blur(5px);
+        }
+        .repair-section {
+            padding: 40px 0;
+        }
+        .repair-form {
+            background-color: #E1F5FE;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary {
+            background-color: #42A5F5;
+            border: none;
+            padding: 10px 30px;
+            transition: background-color 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #0D47A1;
+        }
+        .loader {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100%;
+            background: transparent;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+        .loader.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #lottie-animation {
+            width: 200px;
+            height: 200px;
+        }
+        @media (max-width: 768px) {
+            .repair-form {
+                padding: 20px;
+            }
+            .repair-section {
+                padding: 20px 0;
+            }
+            #lottie-animation {
+                width: 150px;
+                height: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loader" class="loader">
+        <div id="lottie-animation"></div>
+    </div>
+
+    <section class="repair-section">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 style="color: #1976D2;">Request a Repair Service</h2>
+                <a href="index.html" class="btn btn-secondary">Back to Home</a>
+            </div>
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="repair-form">
+                        <form id="repairForm" enctype="multipart/form-data">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Full Name</label>
+                                    <input type="text" 
+                                    class="form-control" 
+                                    id="name" 
+                                    required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">Email Address</label>
+                                    <input type="email" 
+                                    class="form-control" 
+                                    id="email" 
+                                    required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="phone" class="form-label">Phone Number</label>
+                                    <input type="tel" 
+                                    class="form-control" 
+                                    id="phone" 
+                                    required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="deviceType" class="form-label">Device Type</label>
+                                    <select class="form-select" 
+                                    id="deviceType" 
+                                    required>
+                                        <option value="">Select Device</option>
+                                        <option value="iPhone">iPhone</option>
+                                        <option value="Samsung">Samsung Phone</option>
+                                        <option value="Other Phone">Other Phone</option>
+                                        <option value="MacBook">MacBook</option>
+                                        <option value="Laptop">Other Laptop</option>
+                                        <option value="Tablet">Tablet</option>
+                                        <option value="Gaming Console">Gaming Console</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="deviceModel" class="form-label">Device Model (e.g., iPhone 13, Galaxy S23)</label>
+                                    <input type="text" 
+                                    class="form-control" 
+                                    id="deviceModel" 
+                                    required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="issue" class="form-label">Describe the Issue</label>
+                                    <textarea class="form-control" 
+                                    id="issue" 
+                                    rows="5" 
+                                    required 
+                                    placeholder="e.g., Cracked screen, battery not charging, software issues"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="image" class="form-label">Upload Image (Optional)</label>
+                                    <input type="file" 
+                                    class="form-control" 
+                                    id="image" 
+                                    name="image" 
+                                    accept="image/*">
+                                    <small class="form-text text-muted">Upload a picture of the device or issue (e.g., cracked screen).</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Preferred Contact Method</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" 
+                                        type="radio" 
+                                        name="contactMethod" 
+                                        id="contactEmail" 
+                                        value="email" 
+                                        required>
+                                        <label class="form-check-label" 
+                                        for="contactEmail">Email</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" 
+                                        type="radio" 
+                                        name="contactMethod" 
+                                        id="contactPhone" 
+                                        value="phone" 
+                                        required>
+                                        <label class="form-check-label" 
+                                        for="contactPhone">Phone</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" 
+                                        type="radio" 
+                                        name="contactMethod" 
+                                        id="contactWhatsApp" 
+                                        value="whatsapp" 
+                                        required>
+                                        <label class="form-check-label" 
+                                        for="contactWhatsApp">WhatsApp</label>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="preferredDate" class="form-label">Preferred Appointment Date</label>
+                                    <input type="date" 
+                                    class="form-control" 
+                                    id="preferredDate" 
+                                    required>
+                                </div>
+                                <button type="submit" 
+                                class="btn btn-primary w-100">Submit Request</button>
+                            </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.7.4/lottie.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Add loader-active class to body
+            $('body').addClass('loader-active');
+
+            // Initialize Lottie animation
+            const animation = lottie.loadAnimation({
+                container: document.getElementById('lottie-animation'),
+                renderer: 'svg',
+                loop: true,
+                autoplay: true,
+                animationData: {
+                    "v": "5.0.1",
+                    "fr": 10,
+                    "ip": 0,
+                    "op": 20,
+                    "w": 800,
+                    "h": 600,
+                    "ddd": 0,
+                    "assets": [],
+                    "layers": [
+                        {
+                            "ind": 3,
+                            "nm": "Layer 3",
+                            "ks": {
+                                "p": {
+                                    "a": 1,
+                                    "k": [
+                                        {"t": 0, "s": [456.419, 423.252, 0], "to": [-161.825, -53.536, 0], "ti": [-62.867, 94.219, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [371.703, 167.513, 0]},
+                                        {"t": 10, "s": [371.703, 167.513, 0], "to": [0, 0, 0], "ti": [0, 0, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [456.419, 423.252, 0]},
+                                        {"t": 20, "s": [456.419, 423.252, 0]}
+                                    ]
+                                },
+                                "a": {"a": 0, "k": [-24.5, -24.5, 0]},
+                                "s": {"a": 0, "k": [100, 100, 100]},
+                                "r": {"a": 0, "k": -43.065},
+                                "o": {"a": 0, "k": 100}
+                            },
+                            "ao": 0,
+                            "ip": 0,
+                            "op": 20,
+                            "st": 0,
+                            "bm": 3,
+                            "sr": 1,
+                            "ty": 4,
+                            "shapes": [
+                                {
+                                    "ty": "gr",
+                                    "it": [
+                                        {"d": 1, "ty": "el", "s": {"a": 0, "k": [210.919, 210.919]}, "p": {"a": 0, "k": [0, 0]}},
+                                        {"ty": "fl", "c": {"a": 0, "k": [0, 0.7765, 1, 1]}, "hd": false, "o": {"a": 0, "k": 100}, "r": 1},
+                                        {"ty": "tr", "p": {"a": 0, "k": [0, 0]}, "a": {"a": 0, "k": [0, 0]}, "s": {"a": 0, "k": [100, 100]}, "r": {"a": 0, "k": 0}, "o": {"a": 0, "k": 100}, "sk": {"a": 0, "k": 0}, "sa": {"a": 0, "k": 0}}
+                                    ],
+                                    "nm": "Object",
+                                    "hd": false
+                                }
+                            ]
+                        },
+                        {
+                            "ind": 2,
+                            "nm": "Layer 2",
+                            "ks": {
+                                "p": {
+                                    "a": 1,
+                                    "k": [
+                                        {"t": 0, "s": [361.777, 165.918, 0], "to": [0, 0, 0], "ti": [0, 0, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [214.784, 406.838, 0]},
+                                        {"t": 10, "s": [214.784, 406.838, 0], "to": [-83.035, -34.503, 0], "ti": [0, 0, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [361.777, 165.918, 0]},
+                                        {"t": 20, "s": [361.777, 165.918, 0]}
+                                    ]
+                                },
+                                "a": {"a": 0, "k": [-66.5, -66.5, 0]},
+                                "s": {"a": 0, "k": [100, 100, 100]},
+                                "r": {"a": 0, "k": -43.065},
+                                "o": {"a": 0, "k": 100}
+                            },
+                            "ao": 0,
+                            "ip": 0,
+                            "op": 20,
+                            "st": 0,
+                            "bm": 3,
+                            "sr": 1,
+                            "ty": 4,
+                            "shapes": [
+                                {
+                                    "ty": "gr",
+                                    "it": [
+                                        {"d": 1, "ty": "el", "s": {"a": 0, "k": [236, 236]}, "p": {"a": 0, "k": [0, 0]}},
+                                        {"ty": "fl", "c": {"a": 0, "k": [0, 0.1686, 0.1686, 1]}, "hd": false, "o": {"a": 0, "k": 100}, "r": 1},
+                                        {"ty": "tr", "p": {"a": 0, "k": [0, 0]}, "a": {"a": 0, "k": [0, 0]}, "s": {"a": 0, "k": [100, 100]}, "r": {"a": 0, "k": 0}, "o": {"a": 0, "k": 100}, "sk": {"a": 0, "k": 0}, "sa": {"a": 0, "k": 0}}
+                                    ],
+                                    "nm": "Object",
+                                    "hd": false
+                                }
+                            ]
+                        },
+                        {
+                            "ind": 1,
+                            "nm": "Layer 1",
+                            "ks": {
+                                "p": {
+                                    "a": 1,
+                                    "k": [
+                                        {"t": 0, "s": [263.776, 342.564, 0], "to": [0, 0, 0], "ti": [0, 0, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [545.716, 355.446, 0]},
+                                        {"t": 10, "s": [545.716, 355.446, 0], "to": [-7.345, 74.699, 0], "ti": [0, 0, 0], "i": {"x": [0.15], "y": [0.86]}, "o": {"x": [0.785], "y": [0.135]}, "e": [263.776, 342.564, 0]},
+                                        {"t": 20, "s": [263.776, 342.564, 0]}
+                                    ]
+                                },
+                                "a": {"a": 0, "k": [0, 0, 0]},
+                                "s": {"a": 0, "k": [100, 100, 100]},
+                                "r": {"a": 0, "k": -43.065},
+                                "o": {"a": 0, "k": 100}
+                            },
+                            "ao": 0,
+                            "ip": 0,
+                            "op": 20,
+                            "st": 0,
+                            "bm": 3,
+                            "sr": 1,
+                            "ty": 4,
+                            "shapes": [
+                                {
+                                    "ty": "gr",
+                                    "it": [
+                                        {"d": 1, "ty": "el", "s": {"a": 0, "k": [150.135, 150.135]}, "p": {"a": 0, "k": [0, 0]}},
+                                        {"ty": "fl", "c": {"a": 0, "k": [0.1804, 0.0118, 0.898, 1]}, "hd": false, "o": {"a": 0, "k": 100}, "r": 1},
+                                        {"ty": "tr", "p": {"a": 0, "k": [0, 0]}, "a": {"a": 0, "k": [0, 0]}, "s": {"a": 0, "k": [100, 100]}, "r": {"a": 0, "k": 0}, "o": {"a": 0, "k": 100}, "sk": {"a": 0, "k": 0}, "sa": {"a": 0, "k": 0}}
+                                    ],
+                                    "nm": "Object",
+                                    "hd": false
+                                }
+                            ]
+                        }
+                    ],
+                    "markers": []
+                }
+            });
+
+            // Hide loader and remove blur after 2 seconds
+            setTimeout(() => {
+                $('#loader').addClass('hidden');
+                $('body').removeClass('loader-active');
+            }, 2000);
+
+            // Handle form submission
+            $('#repairForm').submit(function(e) {
+                e.preventDefault();
+                const name = $('#name').val();
+                const email = $('#email').val();
+                const phone = $('#phone').val();
+                const deviceType = $('#deviceType').val();
+                const deviceModel = $('#deviceModel').val();
+                const issue = $('#issue').val();
+                const contactMethod = $('input[name="contactMethod"]:checked').val();
+                const preferredDate = $('#preferredDate').val();
+                const image = $('#image')[0].files[0];
+
+                // Basic validation (image is optional)
+                if (!name || !email || !phone || !deviceType || !deviceModel || !issue || !contactMethod || !preferredDate) {
+                    alert('Please fill out all required fields.');
+                    return;
+                }
+
+                // Prepare FormData for file upload
+                const formData = new FormData();
+                formData.append('name', name);
+                formData.append('email', email);
+                formData.append('phone', phone);
+                formData.append('deviceType', deviceType);
+                formData.append('deviceModel', deviceModel);
+                formData.append('issue', issue);
+                formData.append('contactMethod', contactMethod);
+                formData.append('preferredDate', preferredDate);
+                if (image) {
+                    formData.append('image', image);
+                }
+
+                // Send to backend
+                $.ajax({
+                    url: '/api/repairs',
+                    method: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        alert(response.message);
+                        $('#repairForm')[0].reset();
+                    },
+                    error: function(err) {
+                        alert('Error submitting repair request. Please try again.');
+                    }
+                });
+            });
+
+            // Set minimum date for appointment to today
+            const today = new Date().toISOString().split('T')[0];
+            $('#preferredDate').attr('min', today);
+        });
+    </script>
+</body>
+</html>
