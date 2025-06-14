@@ -26,7 +26,7 @@ const User = mongoose.model('User', new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   phone: { type: String, required: true },
   password: { type: String, required: true },
-  role: { type: String, default: 'user' }, // For admin.html
+  role: { type: String, default: 'user' },
   isAdmin: { type: Boolean, default: false },
   resetToken: String,
   resetTokenExpiry: Date,
@@ -44,20 +44,24 @@ const Product = mongoose.model('Product', new mongoose.Schema({
 
 const Order = mongoose.model('Order', new mongoose.Schema({
   orderId: { type: String, required: true, unique: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  name: String,
-  email: String,
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  phone: { type: String, required: true },
   items: [{
-    name: String,
-    price: Number,
-    quantity: Number,
+    name: { type: String, required: true },
+    price: { type: Number, required: true },
+    quantity: { type: Number, required: true },
     image: String
   }],
-  total: Number,
+  total: { type: Number, required: true },
+  subtotal: { type: Number, required: true },
+  deliveryFee: { type: Number, required: true },
   status: { type: String, default: 'Pending' },
-  shippingAddress: String,
-  billingAddress: String,
-  paymentMethod: String,
+  shippingAddress: { type: String, required: true },
+  billingAddress: { type: String, required: true },
+  paymentMethod: { type: String, required: true },
+  deliveryOption: { type: String, required: true },
   createdAt: { type: Date, default: Date.now }
 }));
 
@@ -190,37 +194,77 @@ app.get('/api/auth/profile', authMiddleware, async (req, res) => {
   }
 });
 
+// Order routes
+app.post('/api/orders', async (req, res) => {
+  try {
+    const { name, email, phone, items, total, shippingAddress, billingAddress, paymentMethod, deliveryOption, subtotal, deliveryFee } = req.body;
+    if (!name || !email || !phone || !items || !total || !shippingAddress || !billingAddress || !paymentMethod || !deliveryOption || !subtotal || !deliveryFee) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+    const token = req.headers.authorization?.split(' ')[1];
+    let userId = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        userId = decoded.userId;
+      } catch (err) {
+        // Invalid token, proceed as guest
+      }
+    }
+    const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const order = new Order({
+      orderId,
+      userId,
+      name,
+      email,
+      phone,
+      items,
+      total,
+      shippingAddress,
+      billingAddress,
+      paymentMethod,
+      deliveryOption,
+      subtotal,
+      deliveryFee
+    });
+    await order.save();
+    // Send confirmation email
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Order Confirmation - Caleb Messiah Tech',
+      html: `
+        <p>Dear ${name},</p>
+        <p>Your order has been placed successfully!</p>
+        <p><strong>Order ID:</strong> ${orderId}</p>
+        <p><strong>Total:</strong> ₦${total.toLocaleString()}</p>
+        <p><strong>Payment Method:</strong> ${paymentMethod === 'pod' ? 'Payment on Delivery' : paymentMethod === 'card' ? 'Credit/Debit Card' : 'Bank Transfer'}</p>
+        <p><strong>Shipping Address:</strong> ${shippingAddress}</p>
+        <p>Thank you for shopping with us!</p>
+      `
+    });
+    res.status(201).json({ message: 'Order created', order });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/api/orders', authMiddleware, async (req, res) => {
+  try {
+    const orders = await Order.find({ userId: req.user.userId }).sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Admin routes
 app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
     res.json(orders);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Add to server.js after admin routes
-app.post('/api/orders', authMiddleware, async (req, res) => {
-  try {
-    const { items, total, shippingAddress, billingAddress, paymentMethod } = req.body;
-    if (!items || !total || !shippingAddress || !billingAddress || !paymentMethod) {
-      return res.status(400).json({ message: 'All fields are required' });
-    }
-    const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const order = new Order({
-      orderId,
-      userId: req.user.userId,
-      name: req.body.name,
-      email: req.body.email,
-      items,
-      total,
-      shippingAddress,
-      billingAddress,
-      paymentMethod
-    });
-    await order.save();
-    res.status(201).json({ message: 'Order created', order });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
