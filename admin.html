@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -89,6 +89,19 @@
             0% { transform: rotate(0deg); } 
             100% { transform: rotate(360deg); } 
         }
+        .table { 
+            background-color: #E1F5FE; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+        }
+        .table th, .table td { 
+            vertical-align: middle; 
+        }
+        .repair-image { 
+            max-width: 100px; 
+            height: auto; 
+            border-radius: 5px; 
+        }
         @media (max-width: 768px) {
             .admin-section { 
                 padding: 20px 0; 
@@ -96,6 +109,12 @@
             .card { 
                 font-size: 0.9rem; 
                 padding: 15px; 
+            }
+            .table { 
+                font-size: 0.9rem; 
+            }
+            .repair-image { 
+                max-width: 80px; 
             }
         }
     </style>
@@ -116,6 +135,9 @@
                     <a class="nav-link active" id="orders-tab" data-bs-toggle="tab" href="#orders">Orders</a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link" id="repairs-tab" data-bs-toggle="tab" href="#repairs">Repairs</a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" id="products-tab" data-bs-toggle="tab" href="#products">Products</a>
                 </li>
                 <li class="nav-item">
@@ -130,6 +152,26 @@
                 <div class="tab-pane fade show active" id="orders">
                     <h4>Manage Orders</h4>
                     <div id="orderList"></div>
+                </div>
+                <!-- Repairs Tab -->
+                <div class="tab-pane fade" id="repairs">
+                    <h4>Manage Repairs</h4>
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Repair ID</th>
+                                <th>Customer</th>
+                                <th>Device</th>
+                                <th>Issue</th>
+                                <th>Contact</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Image</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="repairsTable"></tbody>
+                    </table>
                 </div>
                 <!-- Products Tab -->
                 <div class="tab-pane fade" id="products">
@@ -355,6 +397,51 @@
                 });
             }
 
+            // Fetch repairs
+            function loadRepairs() {
+                $.ajax({
+                    url: '/api/admin/repairs',
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    success: function(repairs) {
+                        const repairsTable = $('#repairsTable');
+                        repairsTable.empty();
+                        if (repairs.length === 0) {
+                            repairsTable.append('<tr><td colspan="9" class="text-center">No repairs found.</td></tr>');
+                        } else {
+                            repairs.forEach(repair => {
+                                repairsTable.append(`
+                                    <tr data-id="${repair._id}">
+                                        <td>${repair.repairId}</td>
+                                        <td>${repair.name} (${repair.email})</td>
+                                        <td>${repair.deviceType} (${repair.deviceModel})</td>
+                                        <td>${repair.issue}</td>
+                                        <td>${repair.contactMethod}</td>
+                                        <td>${new Date(repair.preferredDate).toLocaleDateString()}</td>
+                                        <td>
+                                            <select class="status-select" data-id="${repair._id}">
+                                                <option value="Pending" ${repair.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                                                <option value="In Progress" ${repair.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                                                <option value="Completed" ${repair.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            ${repair.image ? `<img src="${repair.image}" alt="Device Image" class="repair-image">` : 'No Image'}
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-danger btn-sm delete-repair" data-id="${repair._id}">Delete</button>
+                                        </td>
+                                    </tr>
+                                `);
+                            });
+                        }
+                    },
+                    error: function(err) {
+                        $('#repairsTable').append('<tr><td colspan="9" class="text-center">Error loading repairs.</td></tr>');
+                    }
+                });
+            }
+
             // Fetch products
             function loadProducts() {
                 $.ajax({
@@ -467,28 +554,26 @@
                 });
             }
 
-            // Load initial data
-            loadOrders();
-            loadProducts();
-            loadUsers();
-            loadAnalytics();
-
             // Update order status
             $(document).on('change', '.status-select', function() {
-                const orderId = $(this).data('id');
+                const id = $(this).data('id');
                 const status = $(this).val();
+                const isRepair = $(this).closest('table').is('#repairsTable');
+                const url = isRepair ? `/api/admin/repairs/${id}` : `/api/admin/orders/${id}`;
                 $.ajax({
-                    url: `/api/admin/orders/${orderId}`,
+                    url: url,
                     method: 'PUT',
                     headers: { 'Authorization': `Bearer ${token}` },
                     contentType: 'application/json',
                     data: JSON.stringify({ status }),
                     success: function(response) {
-                        alert('Order status updated.');
-                        $(`[data-id="${orderId}"] .badge`).removeClass('bg-secondary bg-warning bg-info bg-success')
-                            .addClass(`bg-${status === 'Delivered' ? 'success' : status === 'Shipped' ? 'info' : status === 'Processing' ? 'warning' : 'secondary'}`)
-                            .text(status);
-                        loadAnalytics();
+                        alert(`${isRepair ? 'Repair' : 'Order'} status updated.`);
+                        if (!isRepair) {
+                            $(`[data-id="${id}"] .badge`).removeClass('bg-secondary bg-warning bg-info bg-success')
+                                .addClass(`bg-${status === 'Delivered' ? 'success' : status === 'Shipped' ? 'info' : status === 'Processing' ? 'warning' : 'secondary'}`)
+                                .text(status);
+                            loadAnalytics();
+                        }
                     },
                     error: function(err) {
                         alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
@@ -508,6 +593,24 @@
                         alert('Order deleted.');
                         $(`[data-id="${orderId}"]`).remove();
                         loadAnalytics();
+                    },
+                    error: function(err) {
+                        alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
+                    }
+                });
+            });
+
+            // Delete repair
+            $(document).on('click', '.delete-repair', function() {
+                if (!confirm('Are you sure you want to delete this repair?')) return;
+                const repairId = $(this).data('id');
+                $.ajax({
+                    url: `/api/admin/repairs/${repairId}`,
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    success: function(response) {
+                        alert('Repair deleted.');
+                        $(`[data-id="${repairId}"]`).remove();
                     },
                     error: function(err) {
                         alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
@@ -698,6 +801,13 @@
                 localStorage.removeItem('token');
                 window.location.href = 'index.html';
             });
+
+            // Load initial data
+            loadOrders();
+            loadRepairs();
+            loadProducts();
+            loadUsers();
+            loadAnalytics();
         });
     </script>
 </body>
