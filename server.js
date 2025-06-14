@@ -200,6 +200,32 @@ app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) =
   }
 });
 
+// Add to server.js after admin routes
+app.post('/api/orders', authMiddleware, async (req, res) => {
+  try {
+    const { items, total, shippingAddress, billingAddress, paymentMethod } = req.body;
+    if (!items || !total || !shippingAddress || !billingAddress || !paymentMethod) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+    const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const order = new Order({
+      orderId,
+      userId: req.user.userId,
+      name: req.body.name,
+      email: req.body.email,
+      items,
+      total,
+      shippingAddress,
+      billingAddress,
+      paymentMethod
+    });
+    await order.save();
+    res.status(201).json({ message: 'Order created', order });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { status } = req.body;
