@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order History - Caleb Messiah Tech</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Poppins', sans-serif; 
+            background-color: #90CAF9; 
+            color: #0D47A1; 
+            position: relative; 
+            transition: filter 0.5s ease; 
+        }
+        .loader-active body { 
+            filter: blur(5px); 
+        }
+        .order-section { 
+            padding: 40px 0; 
+        }
+        .order-card { 
+            background-color: #E1F5FE; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+            margin-bottom: 20px; 
+        }
+        .order-card img { 
+            width: 50px; 
+            height: 50px; 
+            object-fit: contain; 
+        }
+        .btn-primary { 
+            background-color: #1976D2; 
+            border: none; 
+        }
+        .btn-primary:hover { 
+            background-color: #0D47A1; 
+        }
+        .loader { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            width: 100%; 
+            background: rgba(255, 255, 255, 0.8); 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            z-index: 9999; 
+            transition: opacity 0.5s ease; 
+        }
+        .loader.hidden { 
+            opacity: 0; 
+            pointer-events: none; 
+        }
+        .spinner { 
+            width: 50px; 
+            height: 50px; 
+            border: 5px solid #42A5F5; 
+            border-top: 5px solid #9bfbcb; 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
+        }
+        @keyframes spin { 
+            0% { transform: rotate(0deg); } 
+            100% { transform: rotate(360deg); } 
+        }
+        @media (max-width: 768px) {
+            .order-section { 
+                padding: 20px 0; 
+            }
+            .order-card { 
+                font-size: 0.9rem; 
+                padding: 15px; 
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loader" class="loader">
+        <div class="spinner"></div>
+    </div>
+
+    <section class="order-section">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 style="color: #1976D2;">Order History</h2>
+                <a href="dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
+            </div>
+            <div id="orderList"></div>
+        </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Loader
+            $('body').addClass('loader-active');
+            setTimeout(() => {
+                $('#loader').addClass('hidden');
+                $('body').removeClass('loader-active');
+            }, 2000);
+
+            // Authentication check
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Please login to view your order history.');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Fetch orders
+            $.ajax({
+                url: '/api/orders',
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` },
+                success: function(orders) {
+                    const orderList = $('#orderList');
+                    if (orders.length === 0) {
+                        orderList.append('<p class="text-center">You have no orders yet.</p>');
+                    } else {
+                        orders.forEach(order => {
+                            const orderHtml = `
+                                <div class="order-card">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h5>Order #${order.orderId}</h5>
+                                        <span class="badge bg-${order.status === 'Delivered' ? 'success' : order.status === 'Shipped' ? 'info' : order.status === 'Processing' ? 'warning' : 'secondary'}">
+                                            ${order.status}
+                                        </span>
+                                    </div>
+                                    <p>Date: ${new Date(order.createdAt).toLocaleDateString()}</p>
+                                    <p>Total: ₦${order.total.toLocaleString()}</p>
+                                    <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#orderDetails${order._id}">
+                                        View Details
+                                    </button>
+                                    <button class="btn btn-secondary btn-sm ms-2 track-order" data-status="${order.status}">Track Order</button>
+                                    <div class="collapse mt-3" id="orderDetails${order._id}">
+                                        <h6>Items:</h6>
+                                        <ul class="list-unstyled">
+                                            ${order.items.map(item => `
+                                                <li class="d-flex mb-2">
+                                                    <img src="${item.image || 'images/default.png'}" alt="${item.name}">
+                                                    <div class="ms-2">
+                                                        <p class="mb-1">${item.name}</p>
+                                                        <p class="mb-1">Qty: ${item.quantity}</p>
+                                                        <p class="mb-1">₦${(item.price * item.quantity).toLocaleString()}</p>
+                                                    </div>
+                                                </li>
+                                            `).join('')}
+                                        </ul>
+                                        <h6>Shipping Address:</h6>
+                                        <p>${order.shippingAddress}</p>
+                                        <h6>Billing Address:</h6>
+                                        <p>${order.billingAddress}</p>
+                                        <h6>Payment Method:</h6>
+                                        <p>${order.paymentMethod === 'card' ? 'Credit/Debit Card' : order.paymentMethod === 'bank' ? 'Bank Transfer' : 'Payment on Delivery'}</p>
+                                    </div>
+                                </div>
+                            `;
+                            orderList.append(orderHtml);
+                        });
+                    }
+                },
+                error: function(err) {
+                    $('#orderList').append('<p class="text-center">Error loading orders.</p>');
+                }
+            });
+
+            // Track order (simple status display)
+            $(document).on('click', '.track-order', function() {
+                const status = $(this).data('status');
+                alert(`Order Status: ${status}`);
+            });
+
+            // Logout
+            $(document).on('click', '#logout', function(e) {
+                e.preventDefault();
+                localStorage.removeItem('token');
+                window.location.href = 'index.html';
+            });
+        });
+    </script>
+</body>
+</html>
