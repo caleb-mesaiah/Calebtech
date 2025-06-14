@@ -1,11 +1,11 @@
  const express = require('express');
-const cors = require('cors');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
-const crypto = require('crypto');
+const multer = require('multer');
 const path = require('path');
+const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
@@ -13,403 +13,448 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('Connected to MongoDB'))
+// MongoDB Connection
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Models
-const User = mongoose.model('User', new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  phone: { type: String, required: true },
-  password: { type: String, required: true },
-  role: { type: String, default: 'user' },
-  isAdmin: { type: Boolean, default: false },
-  resetToken: String,
-  resetTokenExpiry: Date,
-  createdAt: { type: Date, default: Date.now }
-}));
+const User = require('./models/User');
+const Order = require('./models/Order');
+const Repair = require('./models/Repair');
+const Product = require('./models/Product');
 
-const Product = mongoose.model('Product', new mongoose.Schema({
-  name: { type: String, required: true },
-  price: { type: Number, required: true },
-  stock: { type: Number, required: true },
-  image: String,
-  description: String,
-  createdAt: { type: Date, default: Date.now }
-}));
-
-const Order = mongoose.model('Order', new mongoose.Schema({
-  orderId: { type: String, required: true, unique: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  name: { type: String, required: true },
-  email: { type: String, required: true },
-  phone: { type: String, required: true },
-  items: [{
-    name: { type: String, required: true },
-    price: { type: Number, required: true },
-    quantity: { type: Number, required: true },
-    image: String
-  }],
-  total: { type: Number, required: true },
-  subtotal: { type: Number, required: true },
-  deliveryFee: { type: Number, required: true },
-  status: { type: String, default: 'Pending' },
-  shippingAddress: { type: String, required: true },
-  billingAddress: { type: String, required: true },
-  paymentMethod: { type: String, required: true },
-  deliveryOption: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now }
-}));
+// Multer for image uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'public/uploads/'),
+    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
+});
+const upload = multer({ storage });
 
 // Nodemailer setup
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
 });
 
-// Middleware to verify JWT
+// Auth Middleware
 const authMiddleware = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'No token provided' });
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    res.status(401).json({ message: 'Invalid token' });
-  }
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        res.status(401).json({ message: 'Invalid token' });
+    }
 };
 
-// Middleware to verify admin
+// Admin Middleware
 const adminMiddleware = (req, res, next) => {
-  if (!req.user.isAdmin) return res.status(403).json({ message: 'Admin access required' });
-  next();
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+    }
+    next();
 };
 
-// Auth routes
+// Routes
+// User Authentication
 app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { name, email, phone, password } = req.body;
-    if (!name || !email || !phone || !password) {
-      return res.status(400).json({ message: 'All fields are required' });
+    try {
+        const { name, email, password, phone, address } = req.body;
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ message: 'Email already registered' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = new User({ name, email, password: hashedPassword, phone, address, role: 'user' });
+        await user.save();
+
+        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        res.status(201).json({ token, user: { id: user._id, name, email, role: user.role } });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
     }
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email already exists' });
-    }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ name, email, phone, password: hashedPassword });
-    await user.save();
-    res.status(201).json({ message: 'User registered successfully' });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
 });
 
 app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: 'All fields are required' });
-    }
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-    const token = jwt.sign({ userId: user._id, isAdmin: user.isAdmin, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
 
-app.post('/api/auth/forgot-password', async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: 'Email is required' });
-    }
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: 'User not found' });
-    }
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    user.resetToken = resetToken;
-    user.resetTokenExpiry = Date.now() + 3600000; // 1 hour
-    await user.save();
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
 
-    const resetLink = `${process.env.APP_URL}/reset-password.html?token=${resetToken}`;
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Password Reset Request',
-      html: `<p>Click <a href="${resetLink}">here</a> to reset your password. Link expires in 1 hour.</p>`
-    });
-
-    res.json({ message: 'Password reset link sent' });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-app.post('/api/auth/reset-password', async (req, res) => {
-  try {
-    const { token, password } = req.body;
-    if (!token || !password) {
-      return res.status(400).json({ message: 'Token and password are required' });
+        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        res.json({ token, user: { id: user._id, name: user.name, email, role: user.role } });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
     }
-    const user = await User.findOne({
-      resetToken: token,
-      resetTokenExpiry: { $gt: Date.now() }
-    });
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid or expired token' });
-    }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    user.password = hashedPassword;
-    user.resetToken = undefined;
-    user.resetTokenExpiry = undefined;
-    await user.save();
-    res.json({ message: 'Password reset successfully' });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
 });
 
 app.get('/api/auth/profile', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.userId).select('-password');
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(user);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
-// Order routes
-app.post('/api/orders', async (req, res) => {
-  try {
-    const { name, email, phone, items, total, shippingAddress, billingAddress, paymentMethod, deliveryOption, subtotal, deliveryFee } = req.body;
-    if (!name || !email || !phone || !items || !total || !shippingAddress || !billingAddress || !paymentMethod || !deliveryOption || !subtotal || !deliveryFee) {
-      return res.status(400).json({ message: 'All fields are required' });
+app.put('/api/auth/profile', authMiddleware, async (req, res) => {
+    try {
+        const { name, phone, address } = req.body;
+        const user = await User.findByIdAndUpdate(
+            req.user.id,
+            { name, phone, address },
+            { new: true, runValidators: true }
+        ).select('-password');
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
     }
-    const token = req.headers.authorization?.split(' ')[1];
-    let userId = null;
-    if (token) {
-      try {
+});
+
+app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const user = await User.findById(req.user.id);
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Current password is incorrect' });
+        }
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        await user.save();
+        res.json({ message: 'Password changed successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const resetLink = `http://localhost:3000/reset-password.html?token=${token}`;
+
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'Password Reset Request',
+            html: `<p>Click <a href="${resetLink}">here</a> to reset your password. Link expires in 1 hour.</p>`
+        });
+
+        res.json({ message: 'Password reset email sent' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        userId = decoded.userId;
-      } catch (err) {
-        // Invalid token, proceed as guest
-      }
+        const user = await User.findById(decoded.id);
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        await user.save();
+        res.json({ message: 'Password reset successfully' });
+    } catch (error) {
+        res.status(400).json({ message: 'Invalid or expired token' });
     }
-    const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const order = new Order({
-      orderId,
-      userId,
-      name,
-      email,
-      phone,
-      items,
-      total,
-      shippingAddress,
-      billingAddress,
-      paymentMethod,
-      deliveryOption,
-      subtotal,
-      deliveryFee
-    });
-    await order.save();
-    // Send confirmation email
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Order Confirmation - Caleb Messiah Tech',
-      html: `
-        <p>Dear ${name},</p>
-        <p>Your order has been placed successfully!</p>
-        <p><strong>Order ID:</strong> ${orderId}</p>
-        <p><strong>Total:</strong> ₦${total.toLocaleString()}</p>
-        <p><strong>Payment Method:</strong> ${paymentMethod === 'pod' ? 'Payment on Delivery' : paymentMethod === 'card' ? 'Credit/Debit Card' : 'Bank Transfer'}</p>
-        <p><strong>Shipping Address:</strong> ${shippingAddress}</p>
-        <p>Thank you for shopping with us!</p>
-      `
-    });
-    res.status(201).json({ message: 'Order created', order });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
+});
+
+// Products
+app.get('/api/products', async (req, res) => {
+    try {
+        const products = await Product.find();
+        res.json(products);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.post('/api/products', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { name, description, price, image } = req.body;
+        const product = new Product({ name, description, price, image });
+        await product.save();
+        res.status(201).json(product);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { name, description, price, image } = req.body;
+        const product = await Product.findByIdAndUpdate(
+            req.params.id,
+            { name, description, price, image },
+            { new: true }
+        );
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        res.json(product);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.delete('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const product = await Product.findByIdAndDelete(req.params.id);
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        res.json({ message: 'Product deleted' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Orders
+app.post('/api/orders', authMiddleware, async (req, res) => {
+    try {
+        const { items, total, shippingAddress } = req.body;
+        const orderId = `ORD${Date.now()}`;
+        const order = new Order({
+            userId: req.user.id,
+            orderId,
+            items,
+            total,
+            shippingAddress,
+            status: 'Processing'
+        });
+        await order.save();
+
+        // Send order confirmation email
+        const user = await User.findById(req.user.id);
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: user.email,
+            subject: 'Order Confirmation',
+            html: `<p>Thank you for your order #${orderId}. Total: ₦${total.toLocaleString()}. Status: ${order.status}</p>`
+        });
+
+        res.status(201).json(order);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 app.get('/api/orders', authMiddleware, async (req, res) => {
-  try {
-    const orders = await Order.find({ userId: req.user.userId }).sort({ createdAt: -1 });
-    res.json(orders);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
+    try {
+        const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
+        res.json(orders);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
-// Admin routes
 app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-    res.json(orders);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
+    try {
+        const orders = await Order.find().sort({ createdAt: -1 }).populate('userId', 'name email');
+        res.json(orders);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const { status } = req.body;
-    const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
-    if (!order) return res.status(404).json({ message: 'Order not found' });
-    res.json(order);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    try {
+        const { status } = req.body;
+        const order = await Order.findByIdAndUpdate(
+            req.params.id,
+            { status },
+            { new: true }
+        ).populate('userId', 'email');
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
 
-app.delete('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const order = await Order.findByIdAndDelete(req.params.id);
-    if (!order) return res.status(404).json({ message: 'Order not found' });
-    res.json({ message: 'Order deleted' });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+        // Send status update email
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: order.userId.email,
+            subject: 'Order Status Update',
+            html: `<p>Your order #${order.orderId} is now ${status}.</p>`
+        });
 
-app.get('/api/admin/products', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const products = await Product.find().sort({ createdAt: -1 });
-    res.json(products);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-app.post('/api/admin/products', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const { name, price, stock, image, description } = req.body;
-    if (!name || !price || !stock) {
-      return res.status(400).json({ message: 'Name, price, and stock are required' });
+        res.json(order);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
     }
-    const product = new Product({ name, price, stock, image, description });
-    await product.save();
-    res.status(201).json(product);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
 });
 
-app.put('/api/admin/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const { name, price, stock, image, description } = req.body;
-    const product = await Product.findByIdAndUpdate(req.params.id, { name, price, stock, image, description }, { new: true });
-    if (!product) return res.status(404).json({ message: 'Product not found' });
-    res.json(product);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
+// Repairs
+app.post('/api/repairs', upload.single('image'), authMiddleware, async (req, res) => {
+    try {
+        const { name, email, phone, deviceType, deviceModel, issue, contactMethod, preferredDate } = req.body;
+        const repairId = `REP${Date.now()}`;
+        const image = req.file ? req.file.filename : null;
+
+        const repair = new Repair({
+            userId: req.user.id,
+            repairId,
+            name,
+            email,
+            phone,
+            deviceType,
+            deviceModel,
+            issue,
+            contactMethod,
+            preferredDate,
+            image,
+            status: 'Pending'
+        });
+        await repair.save();
+
+        // Send repair confirmation email
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'Repair Request Confirmation',
+            html: `<p>Your repair request #${repairId} for ${deviceType} (${deviceModel}) has been received. Status: ${repair.status}</p>`
+        });
+
+        res.status(201).json(repair);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
-app.delete('/api/admin/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const product = await Product.findByIdAndDelete(req.params.id);
-    if (!product) return res.status(404).json({ message: 'Product not found' });
-    res.json({ message: 'Product deleted' });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
+app.get('/api/repairs/user', authMiddleware, async (req, res) => {
+    try {
+        const repairs = await Repair.find({ userId: req.user.id }).sort({ createdAt: -1 });
+        res.json(repairs);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
+app.get('/api/admin/repairs', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const repairs = await Repair.find().sort({ createdAt: -1 }).populate('userId', 'name email');
+        res.json(repairs);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status } = req.body;
+        const repair = await Repair.findByIdAndUpdate(
+            req.params.id,
+            { status },
+            { new: true }
+        ).populate('userId', 'email');
+        if (!repair) {
+            return res.status(404).json({ message: 'Repair not found' });
+        }
+
+        // Send status update email
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: repair.userId.email,
+            subject: 'Repair Status Update',
+            html: `<p>Your repair request #${repairId} is now ${status}.</p>`
+        });
+
+        res.json(repair);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.delete('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const repair = await Repair.findByIdAndDelete(req.params.id);
+        if (!repair) {
+            return res.status(404).json({ message: 'Repair not found' });
+        }
+        res.json({ message: 'Repair deleted' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Users (Admin)
 app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const users = await User.find().select('-password').sort({ createdAt: -1 });
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-app.put('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const { name, email, phone, role } = req.body;
-    const user = await User.findByIdAndUpdate(req.params.id, { name, email, phone, role }, { new: true }).select('-password');
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(user);
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
+    try {
+        const users = await User.find().select('-password');
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const user = await User.findByIdAndDelete(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json({ message: 'User deleted' });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
+    try {
+        const user = await User.findByIdAndDelete(req.params.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json({ message: 'User deleted' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
+// Analytics (Admin)
 app.get('/api/admin/analytics', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const totalSales = await Order.aggregate([
-      { $match: { status: 'Delivered' } },
-      { $group: { _id: null, total: { $sum: '$total' } } }
-    ]);
+    try {
+        const totalUsers = await User.countDocuments();
+        const totalOrders = await Order.countDocuments();
+        const totalRepairs = await Repair.countDocuments();
+        const totalRevenue = await Order.aggregate([
+            { $match: { status: 'Delivered' } },
+            { $group: { _id: null, total: { $sum: '$total' } } }
+        ]);
 
-    const totalOrders = await Order.countDocuments();
-    const pendingOrders = await Order.countDocuments({ status: 'Pending' });
-
-    const topProducts = await Order.aggregate([
-      { $unwind: '$items' },
-      {
-        $group: {
-          _id: '$items.name',
-          totalSold: { $sum: '$items.quantity' },
-          totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
-        }
-      },
-      {
-        $project: {
-          name: '$_id',
-          totalSold: 1,
-          totalRevenue: 1,
-          _id: 0
-        }
-      },
-      { $sort: { totalSold: -1 } },
-      { $limit: 5 }
-    ]);
-
-    res.json({
-      totalSales: totalSales[0]?.total || 0,
-      totalOrders,
-      pendingOrders,
-      topProducts
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
+        res.json({
+            totalUsers,
+            totalOrders,
+            totalRepairs,
+            totalRevenue: totalRevenue[0]?.total || 0
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
-// Serve index.html for non-API routes
+// Serve frontend routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Start server
