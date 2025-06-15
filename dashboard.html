@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -137,7 +137,7 @@
             align-items: center; 
             height: 100vh; 
             width: 100%; 
-            background: transparent; /* Match index.html */
+            background: transparent; 
             position: fixed; 
             top: 0; 
             left: 0; 
@@ -152,10 +152,26 @@
             width: 200px; 
             height: 200px; 
         }
-        .repair-image { 
-            max-width: 100px; 
+        .repair-image, .cart-item-image { 
+            max-width: 50px; 
             height: auto; 
             border-radius: 5px; 
+            margin-left: 10px; 
+        }
+        .cart-list { 
+            background: #E1F5FE; 
+            color: #0D47A1; 
+            padding: 15px; 
+            right: 10px; 
+            width: 300px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+            z-index: 1000; 
+        }
+        .error-message { 
+            color: #dc3545; 
+            font-size: 0.9rem; 
+            display: none; 
+            margin-top: 5px; 
         }
         @media (max-width: 768px) {
             .dashboard-section { 
@@ -165,15 +181,15 @@
                 font-size: 0.9rem; 
                 padding: 15px; 
             }
-            #cartList { 
+            .cart-list { 
                 width: 250px; 
             }
             #lottie-animation { 
                 width: 150px; 
                 height: 150px; 
             }
-            .repair-image { 
-                max-width: 80px; 
+            .repair-image, .cart-item-image { 
+                max-width: 40px; 
             }
         }
     </style>
@@ -200,7 +216,6 @@
                     <li class="nav-item"><a class="nav-link" href="index.html#about">About Us</a></li>
                     <li class="nav-item"><a class="nav-link" href="index.html#faqs">FAQs</a></li>
                     <li class="nav-item"><a class="nav-link" href="repair.html">Repair</a></li>
-                    <!-- NEW: Admin Dashboard link (hidden by default) -->
                     <li class="nav-item d-none" id="adminLink"><a class="nav-link" href="admin.html">Admin Dashboard</a></li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button" data-bs-toggle="dropdown">
@@ -213,9 +228,9 @@
                     </li>
                     <li class="nav-item cart-icon">
                         <a href="#" id="cartIcon"><i class="fas fa-shopping-cart"></i><span id="cartCount">0</span></a>
-                        <div id="cartList" style="display: none; position: absolute; background: #fff; color: #000; padding: 10px; right: 0; top: 100%; width: 300px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); z-index: 1000;">
+                        <div id="cartList" class="cart-list" style="display: none; position: absolute; top: 100%;">
                             <h5>Cart Items</h5>
-                            <ul id="cartItems"></ul>
+                            <ul id="cartItems" class="list-unstyled"></ul>
                             <a href="cart.html" class="btn btn-primary btn-sm mt-2">View Cart</a>
                         </div>
                     </li>
@@ -243,12 +258,14 @@
                             <div class="mb-3">
                                 <label for="phone" class="form-label">Phone Number</label>
                                 <input type="tel" class="form-control" id="phone" required>
+                                <div id="phoneError" class="error-message">Please enter a valid phone number (10-15 digits).</div>
                             </div>
                             <div class="mb-3">
                                 <label for="address" class="form-label">Address</label>
                                 <textarea class="form-control" id="address" rows="3"></textarea>
                             </div>
                             <button type="submit" class="btn btn-primary w-100">Update Profile</button>
+                            <div id="profileError" class="error-message mt-2"></div>
                         </form>
                     </div>
                 </div>
@@ -263,12 +280,15 @@
                             <div class="mb-3">
                                 <label for="newPassword" class="form-label">New Password</label>
                                 <input type="password" class="form-control" id="newPassword" required>
+                                <div id="newPasswordError" class="error-message">Password must be at least 8 characters.</div>
                             </div>
                             <div class="mb-3">
                                 <label for="confirmPassword" class="form-label">Confirm New Password</label>
                                 <input type="password" class="form-control" id="confirmPassword" required>
+                                <div id="confirmPasswordError" class="error-message">Passwords do not match.</div>
                             </div>
                             <button type="submit" class="btn btn-primary w-100">Change Password</button>
+                            <div id="passwordError" class="error-message mt-2"></div>
                         </form>
                     </div>
                 </div>
@@ -279,7 +299,6 @@
                         <a href="order-history.html" class="btn btn-primary w-100">View All Orders</a>
                     </div>
                 </div>
-                <!-- NEW: Repairs section -->
                 <div class="col-md-4 mb-4">
                     <div class="dashboard-card">
                         <h4>Repairs</h4>
@@ -336,7 +355,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.7.4/lottie.min.js"></script>
     <script>
         $(document).ready(function() {
-            // Loader
+            // Loader with Lottie animation
             $('body').addClass('loader-active');
             const animation = lottie.loadAnimation({
                 container: document.getElementById('lottie-animation'),
@@ -479,7 +498,15 @@
             $('#cartCount').text(cartCount);
             if (cart.length > 0) {
                 cart.forEach(item => {
-                    $('#cartItems').append(`<li>${item.name} - ₦${item.price.toLocaleString()} (Qty: ${item.quantity})</li>`);
+                    $('#cartItems').append(`
+                        <li class="mb-2 d-flex align-items-center">
+                            <img src="${item.image || 'images/default.png'}" alt="${item.name}" class="cart-item-image">
+                            <div class="ms-2">
+                                <p class="mb-1">${item.name}</p>
+                                <p class="mb-0">₦${(item.price * item.quantity).toLocaleString()} (Qty: ${item.quantity})</p>
+                            </div>
+                        </li>
+                    `);
                 });
             } else {
                 $('#cartItems').append('<li>Your cart is empty.</li>');
@@ -496,7 +523,7 @@
                 }
             });
 
-            // Fetch user profile
+            // Check authentication
             const token = localStorage.getItem('token');
             if (!token) {
                 alert('Please login to access the dashboard.');
@@ -504,6 +531,7 @@
                 return;
             }
 
+            // Fetch user profile
             $.ajax({
                 url: '/api/auth/profile',
                 method: 'GET',
@@ -514,7 +542,6 @@
                     $('#email').val(user.email);
                     $('#phone').val(user.phone || '');
                     $('#address').val(user.address || '');
-                    // NEW: Show Admin Dashboard link if admin
                     if (user.role === 'admin') {
                         $('#adminLink').removeClass('d-none');
                     }
@@ -526,12 +553,28 @@
                 }
             });
 
-            // Update profile
+            // Update profile with validation
             $('#profileForm').submit(function(e) {
                 e.preventDefault();
-                const name = $('#name').val();
-                const phone = $('#phone').val();
-                const address = $('#address').val();
+                const name = $('#name').val().trim();
+                const phone = $('#phone').val().trim();
+                const address = $('#address').val().trim();
+                const phoneRegex = /^\d{10,15}$/;
+                const phoneError = $('#phoneError');
+                const profileError = $('#profileError');
+
+                phoneError.hide();
+                profileError.hide();
+
+                if (!name) {
+                    profileError.text('Full name is required.').show();
+                    return;
+                }
+                if (phone && !phoneRegex.test(phone)) {
+                    phoneError.show();
+                    return;
+                }
+
                 $.ajax({
                     url: '/api/auth/profile',
                     method: 'PUT',
@@ -539,25 +582,39 @@
                     contentType: 'application/json',
                     data: JSON.stringify({ name, phone, address }),
                     success: function(response) {
-                        alert('Profile updated successfully.');
+                        profileError.text('Profile updated successfully.').css('color', '#28a745').show();
                         $('#userName').text(name.split(' ')[0]);
+                        setTimeout(() => profileError.hide(), 3000);
                     },
                     error: function(err) {
-                        alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
+                        profileError.text(err.responseJSON?.message || 'Failed to update profile.').show();
                     }
                 });
             });
 
-            // Change password
+            // Change password with validation
             $('#passwordForm').submit(function(e) {
                 e.preventDefault();
                 const currentPassword = $('#currentPassword').val();
                 const newPassword = $('#newPassword').val();
                 const confirmPassword = $('#confirmPassword').val();
-                if (newPassword !== confirmPassword) {
-                    alert('New passwords do not match.');
+                const newPasswordError = $('#newPasswordError');
+                const confirmPasswordError = $('#confirmPasswordError');
+                const passwordError = $('#passwordError');
+
+                newPasswordError.hide();
+                confirmPasswordError.hide();
+                passwordError.hide();
+
+                if (newPassword.length < 8) {
+                    newPasswordError.show();
                     return;
                 }
+                if (newPassword !== confirmPassword) {
+                    confirmPasswordError.show();
+                    return;
+                }
+
                 $.ajax({
                     url: '/api/auth/change-password',
                     method: 'POST',
@@ -565,11 +622,12 @@
                     contentType: 'application/json',
                     data: JSON.stringify({ currentPassword, newPassword }),
                     success: function(response) {
-                        alert('Password changed successfully.');
+                        passwordError.text('Password changed successfully.').css('color', '#28a745').show();
                         $('#passwordForm')[0].reset();
+                        setTimeout(() => passwordError.hide(), 3000);
                     },
                     error: function(err) {
-                        alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
+                        passwordError.text(err.responseJSON?.message || 'Failed to change password.').show();
                     }
                 });
             });
@@ -600,7 +658,7 @@
                 }
             });
 
-            // NEW: Fetch recent repairs
+            // Fetch recent repairs
             $.ajax({
                 url: '/api/repairs/user',
                 method: 'GET',
@@ -613,7 +671,7 @@
                             $('#repairList').append(`
                                 <li class="mb-2">
                                     Repair #${repair.repairId} - ${repair.deviceType} (${repair.deviceModel})
-                                    ${repair.image ? `<img src="/uploads/${repair.image}" alt="Repair Image" class="repair-image ms-2">` : '<span class="ms-2 text-muted">No Image</span>'}
+                                    <img src="${repair.image ? '/Uploads/' + repair.image : 'images/default.png'}" alt="Repair Image" class="repair-image">
                                     <span class="badge bg-${repair.status === 'Completed' ? 'success' : repair.status === 'In Progress' ? 'info' : repair.status === 'Pending' ? 'warning' : 'secondary'}">
                                         ${repair.status}
                                     </span>
