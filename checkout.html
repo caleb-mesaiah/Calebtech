@@ -393,11 +393,16 @@
                                         }),
                                         success: function(orderResponse) {
                                             alert(`Order placed successfully with Credit/Debit Card! Order ID: ${orderResponse.order.orderId}`);
+                                            // Store order details for confirmation page
+                                            localStorage.setItem('lastOrderData', JSON.stringify({
+                                                ...orderData,
+                                                orderId: orderResponse.order.orderId
+                                            }));
                                             cart = [];
                                             cartCount = 0;
                                             localStorage.setItem('cart', JSON.stringify(cart));
                                             renderOrderSummary();
-                                            window.location.href = 'order-confirmation.html';
+                                            window.location.href = `order-confirmation.html?orderId=${encodeURIComponent(orderResponse.order.orderId)}`;
                                         },
                                         error: function(err) {
                                             alert('Error: ' + (err.responseJSON?.message || 'Order creation failed.'));
@@ -423,11 +428,16 @@
                         data: JSON.stringify(orderData),
                         success: function(response) {
                             alert(`Order placed successfully with ${orderData.paymentMethod === 'pod' ? 'Payment on Delivery' : 'Bank Transfer'}! Order ID: ${response.order.orderId}`);
+                            // Store order details for confirmation page
+                            localStorage.setItem('lastOrderData', JSON.stringify({
+                                ...orderData,
+                                orderId: response.order.orderId
+                            }));
                             cart = [];
                             cartCount = 0;
                             localStorage.setItem('cart', JSON.stringify(cart));
                             renderOrderSummary();
-                            window.location.href = 'order-confirmation.html';
+                            window.location.href = `order-confirmation.html?orderId=${encodeURIComponent(response.order.orderId)}`;
                         },
                         error: function(err) {
                             alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
