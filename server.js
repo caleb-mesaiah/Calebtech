@@ -6,6 +6,9 @@ const nodemailer = require('nodemailer');
 const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
+// NEW: Add axios and csurf
+const axios = require('axios');
+const csurf = require('csurf');
 require('dotenv').config();
 
 const app = express();
@@ -14,10 +17,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+// MODIFIED: Use UPLOAD_DIR from .env
+app.use(express.static(path.join(__dirname, process.env.UPLOAD_DIR || 'public')));
+// NEW: CSRF protection (cookie-based)
+const csrfProtection = csurf({ cookie: true });
+app.use(csrfProtection);
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI, {
+mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }).then(() => console.log('MongoDB connected'))
@@ -31,7 +38,8 @@ const Product = require('./models/Product');
 
 // Multer for image uploads
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'public/uploads/'),
+    // MODIFIED: Use UPLOAD_DIR
+    destination: (req, file, cb) => cb(null, path.join(__dirname, process.env.UPLOAD_DIR, 'uploads/')),
     filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
 const upload = multer({ storage });
@@ -67,6 +75,21 @@ const adminMiddleware = (req, res, next) => {
     next();
 };
 
+// Input Validation Middleware
+const validateProductInput = (req, res, next) => {
+    const { name, description, price, brand, stock, image } = req.body;
+    if (!name || !description || !price || !brand || !stock || !image) {
+        return res.status(400).json({ message: 'All fields are required' });
+    }
+    if (typeof price !== 'number' || price < 0) {
+        return res.status(400).json({ message: 'Invalid price' });
+    }
+    if (typeof stock !== 'number' || stock < 0) {
+        return res.status(400).json({ message: 'Invalid stock' });
+    }
+    next();
+};
+
 // Routes
 // User Authentication
 app.post('/api/auth/register', async (req, res) => {
@@ -82,7 +105,7 @@ app.post('/api/auth/register', async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = new User({ name, email, password: hashedPassword, phone, address, role: 'user' });
+        const user = new User({ name, email, password: hashedPassword, phone, address, role: 'user', likedProducts: [] });
         await user.save();
 
         const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -194,17 +217,45 @@ app.post('/api/auth/reset-password', async (req, res) => {
 // Products
 app.get('/api/products', async (req, res) => {
     try {
-        const products = await Product.find();
-        res.json(products);
+        const { search, brand, priceMin, priceMax } = req.query;
+        let query = {};
+
+        if (search) {
+            query.name = { $regex: search, $options: 'i' };
+        }
+        if (brand) {
+            query.brand = brand;
+        }
+        if (priceMin || priceMax) {
+            query.price = {};
+            if (priceMin) query.price.$gte = Number(priceMin);
+            if (priceMax) query.price.$lte = Number(priceMax);
+        }
+
+        const products = await Product.find(query);
+        res.json({ products });
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
     }
 });
 
-app.post('/api/products', authMiddleware, adminMiddleware, async (req, res) => {
+// NEW: Get single product
+app.get('/api/products/:id', async (req, res) => {
     try {
-        const { name, description, price, image } = req.body;
-        const product = new Product({ name, description, price, image });
+        const product = await Product.findById(req.params.id);
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        res.json(product);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.post('/api/products', authMiddleware, adminMiddleware, validateProductInput, async (req, res) => {
+    try {
+        const { name, description, price, brand, stock, image } = req.body;
+        const product = new Product({ name, description, price, brand, stock, image });
         await product.save();
         res.status(201).json(product);
     } catch (error) {
@@ -212,12 +263,12 @@ app.post('/api/products', authMiddleware, adminMiddleware, async (req, res) => {
     }
 });
 
-app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
+app.put('/api/products/:id', authMiddleware, adminMiddleware, validateProductInput, async (req, res) => {
     try {
-        const { name, description, price, image } = req.body;
+        const { name, description, price, brand, stock, image } = req.body;
         const product = await Product.findByIdAndUpdate(
             req.params.id,
-            { name, description, price, image },
+            { name, description, price, brand, stock, image },
             { new: true }
         );
         if (!product) {
@@ -241,10 +292,56 @@ app.delete('/api/products/:id', authMiddleware, adminMiddleware, async (req, res
     }
 });
 
+// NEW: Likes
+app.post('/api/likes/:id', authMiddleware, csrfProtection, async (req, res) => {
+    try {
+        const product = await Product.findById(req.params.id);
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+
+        const user = await User.findById(req.user.id);
+        if (user.likedProducts.includes(product._id)) {
+            return res.status(400).json({ message: 'Product already liked' });
+        }
+
+        user.likedProducts.push(product._id);
+        await user.save();
+        res.json({ message: 'Product liked' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.delete('/api/likes/:id', authMiddleware, csrfProtection, async (req, res) => {
+    try {
+        const product = await Product.findById(req.params.id);
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+
+        const user = await User.findById(req.user.id);
+        const index = user.likedProducts.indexOf(product._id);
+        if (index === -1) {
+            return res.status(400).json({ message: 'Product not liked' });
+        }
+
+        user.likedProducts.splice(index, 1);
+        await user.save();
+        res.json({ message: 'Product unliked' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 // Orders
 app.post('/api/orders', authMiddleware, async (req, res) => {
     try {
         const { items, total, shippingAddress } = req.body;
+        if (!items?.length || !total || !shippingAddress) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+
         const orderId = `ORD${Date.now()}`;
         const order = new Order({
             userId: req.user.id,
@@ -266,6 +363,68 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
         });
 
         res.status(201).json(order);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// NEW: Initialize Paystack transaction
+app.post('/api/orders/initialize', authMiddleware, async (req, res) => {
+    try {
+        const { email, amount, items, shippingAddress } = req.body;
+        if (!email || !amount || !items?.length || !shippingAddress) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+
+        const response = await axios.post(
+            'https://api.paystack.co/transaction/initialize',
+            {
+                email,
+                amount: amount * 100, // Convert to kobo
+                callback_url: 'http://localhost:3000/checkout.html'
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        const { authorization_url, reference } = response.data.data;
+        res.json({ authorization_url, reference });
+    } catch (error) {
+        res.status(500).json({ message: 'Error initializing payment' });
+    }
+});
+
+// NEW: Paystack webhook
+app.post('/api/paystack/webhook', async (req, res) => {
+    try {
+        const { event, data } = req.body;
+        if (event === 'charge.success') {
+            const { reference, amount, customer, metadata } = data;
+            const orderId = `ORD${Date.now()}`;
+            const order = new Order({
+                userId: customer.metadata?.userId || null,
+                orderId,
+                items: metadata?.items || [],
+                total: amount / 100, // Convert from kobo
+                shippingAddress: metadata?.shippingAddress || {},
+                status: 'Processing',
+                paymentReference: reference
+            });
+            await order.save();
+
+            // Send order confirmation email
+            await transporter.sendMail({
+                from: process.env.EMAIL_USER,
+                to: customer.email,
+                subject: 'Order Confirmation',
+                html: `<p>Thank you for your order #${orderId}. Total: ₦${(amount / 100).toLocaleString()}. Status: Processing</p>`
+            });
+        }
+        res.status(200).send('Webhook received');
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
     }
@@ -319,8 +478,13 @@ app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req, re
 app.post('/api/repairs', upload.single('image'), authMiddleware, async (req, res) => {
     try {
         const { name, email, phone, deviceType, deviceModel, issue, contactMethod, preferredDate } = req.body;
+        if (!name || !email || !phone || !deviceType || !deviceModel || !issue || !contactMethod || !preferredDate) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+
         const repairId = `REP${Date.now()}`;
-        const image = req.file ? req.file.filename : null;
+        // MODIFIED: Use UPLOAD_DIR for image path
+        const image = req.file ? `${process.env.UPLOAD_DIR}/Uploads/${req.file.filename}` : null;
 
         const repair = new Repair({
             userId: req.user.id,
@@ -382,12 +546,12 @@ app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req, r
             return res.status(404).json({ message: 'Repair not found' });
         }
 
-        // Send status update email
+        // MODIFIED: Fix repairId reference
         await transporter.sendMail({
             from: process.env.EMAIL_USER,
             to: repair.userId.email,
             subject: 'Repair Status Update',
-            html: `<p>Your repair request #${repairId} is now ${status}.</p>`
+            html: `<p>Your repair request #${repair.repairId} is now ${status}.</p>`
         });
 
         res.json(repair);
@@ -454,7 +618,7 @@ app.get('/api/admin/analytics', authMiddleware, adminMiddleware, async (req, res
 
 // Serve frontend routes
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, process.env.UPLOAD_DIR || 'public', 'index.html'));
 });
 
 // Start server
