@@ -1,9 +1,12 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Repair Service - Caleb Messiah Tech</title>
+    <meta name="description" content="Request a repair service for your device with Caleb Messiah Tech. Submit details and schedule an appointment in Lagos.">
+    <meta name="keywords" content="Caleb Messiah Tech, repair service, device repair, Lagos, tech repairs">
+    <meta name="author" content="Caleb Messiah Tech">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
@@ -29,7 +32,7 @@
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
         .btn-primary {
-            background-color: #42A5F5;
+            background-color: #1976D2;
             border: none;
             padding: 10px 30px;
             transition: background-color 0.3s;
@@ -58,6 +61,21 @@
             width: 200px;
             height: 200px;
         }
+        #imagePreview {
+            max-width: 100%;
+            max-height: 200px;
+            margin-top: 10px;
+            display: none;
+            border-radius: 5px;
+        }
+        .form-control.is-invalid,
+        .form-select.is-invalid {
+            border-color: #dc3545;
+        }
+        .invalid-feedback {
+            color: #dc3545;
+            font-size: 0.875rem;
+        }
         @media (max-width: 768px) {
             .repair-form {
                 padding: 20px;
@@ -68,6 +86,9 @@
             #lottie-animation {
                 width: 150px;
                 height: 150px;
+            }
+            #imagePreview {
+                max-height: 150px;
             }
         }
     </style>
@@ -86,111 +107,77 @@
             <div class="row justify-content-center">
                 <div class="col-md-8">
                     <div class="repair-form">
-                        <form id="repairForm" enctype="multipart/form-data">
-                                <div class="mb-3">
-                                    <label for="name" class="form-label">Full Name</label>
-                                    <input type="text" 
-                                    class="form-control" 
-                                    id="name" 
-                                    required>
+                        <form id="repairForm" enctype="multipart/form-data" novalidate>
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Full Name</label>
+                                <input type="text" class="form-control" id="name" required aria-describedby="nameFeedback">
+                                <div id="nameFeedback" class="invalid-feedback">Please enter your full name.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="email" required aria-describedby="emailFeedback">
+                                <div id="emailFeedback" class="invalid-feedback">Please enter a valid email address.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="phone" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="phone" required aria-describedby="phoneFeedback">
+                                <div id="phoneFeedback" class="invalid-feedback">Please enter a valid phone number (e.g., +2341234567890).</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="deviceType" class="form-label">Device Type</label>
+                                <select class="form-select" id="deviceType" required aria-describedby="deviceTypeFeedback">
+                                    <option value="">Select Device</option>
+                                    <option value="iPhone">iPhone</option>
+                                    <option value="Samsung">Samsung Phone</option>
+                                    <option value="Other Phone">Other Phone</option>
+                                    <option value="MacBook">MacBook</option>
+                                    <option value="Laptop">Other Laptop</option>
+                                    <option value="Tablet">Tablet</option>
+                                    <option value="Gaming Console">Gaming Console</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                <div id="deviceTypeFeedback" class="invalid-feedback">Please select a device type.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="deviceModel" class="form-label">Device Model (e.g., iPhone 13, Galaxy S23)</label>
+                                <input type="text" class="form-control" id="deviceModel" required aria-describedby="deviceModelFeedback">
+                                <div id="deviceModelFeedback" class="invalid-feedback">Please enter the device model.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="issue" class="form-label">Describe the Issue</label>
+                                <textarea class="form-control" id="issue" rows="5" required placeholder="e.g., Cracked screen, battery not charging, software issues" aria-describedby="issueFeedback"></textarea>
+                                <div id="issueFeedback" class="invalid-feedback">Please describe the issue.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="image" class="form-label">Upload Image (Optional)</label>
+                                <input type="file" class="form-control" id="image" name="image" accept="image/jpeg,image/png,image/gif" aria-describedby="imageFeedback">
+                                <small class="form-text text-muted">Upload a picture of the device or issue (max 5MB, JPEG/PNG/GIF).</small>
+                                <div id="imageFeedback" class="invalid-feedback"></div>
+                                <img id="imagePreview" alt="Image Preview" role="img">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Preferred Contact Method</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="contactMethod" id="contactEmail" value="email" required aria-describedby="contactMethodFeedback">
+                                    <label class="form-check-label" for="contactEmail">Email</label>
                                 </div>
-                                <div class="mb-3">
-                                    <label for="email" class="form-label">Email Address</label>
-                                    <input type="email" 
-                                    class="form-control" 
-                                    id="email" 
-                                    required>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="contactMethod" id="contactPhone" value="phone" required>
+                                    <label class="form-check-label" for="contactPhone">Phone</label>
                                 </div>
-                                <div class="mb-3">
-                                    <label for="phone" class="form-label">Phone Number</label>
-                                    <input type="tel" 
-                                    class="form-control" 
-                                    id="phone" 
-                                    required>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="contactMethod" id="contactWhatsApp" value="whatsapp" required>
+                                    <label class="form-check-label" for="contactWhatsApp">WhatsApp</label>
                                 </div>
-                                <div class="mb-3">
-                                    <label for="deviceType" class="form-label">Device Type</label>
-                                    <select class="form-select" 
-                                    id="deviceType" 
-                                    required>
-                                        <option value="">Select Device</option>
-                                        <option value="iPhone">iPhone</option>
-                                        <option value="Samsung">Samsung Phone</option>
-                                        <option value="Other Phone">Other Phone</option>
-                                        <option value="MacBook">MacBook</option>
-                                        <option value="Laptop">Other Laptop</option>
-                                        <option value="Tablet">Tablet</option>
-                                        <option value="Gaming Console">Gaming Console</option>
-                                        <option value="Other">Other</option>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="deviceModel" class="form-label">Device Model (e.g., iPhone 13, Galaxy S23)</label>
-                                    <input type="text" 
-                                    class="form-control" 
-                                    id="deviceModel" 
-                                    required>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="issue" class="form-label">Describe the Issue</label>
-                                    <textarea class="form-control" 
-                                    id="issue" 
-                                    rows="5" 
-                                    required 
-                                    placeholder="e.g., Cracked screen, battery not charging, software issues"></textarea>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="image" class="form-label">Upload Image (Optional)</label>
-                                    <input type="file" 
-                                    class="form-control" 
-                                    id="image" 
-                                    name="image" 
-                                    accept="image/*">
-                                    <small class="form-text text-muted">Upload a picture of the device or issue (e.g., cracked screen).</small>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Preferred Contact Method</label>
-                                    <div class="form-check">
-                                        <input class="form-check-input" 
-                                        type="radio" 
-                                        name="contactMethod" 
-                                        id="contactEmail" 
-                                        value="email" 
-                                        required>
-                                        <label class="form-check-label" 
-                                        for="contactEmail">Email</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" 
-                                        type="radio" 
-                                        name="contactMethod" 
-                                        id="contactPhone" 
-                                        value="phone" 
-                                        required>
-                                        <label class="form-check-label" 
-                                        for="contactPhone">Phone</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" 
-                                        type="radio" 
-                                        name="contactMethod" 
-                                        id="contactWhatsApp" 
-                                        value="whatsapp" 
-                                        required>
-                                        <label class="form-check-label" 
-                                        for="contactWhatsApp">WhatsApp</label>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="preferredDate" class="form-label">Preferred Appointment Date</label>
-                                    <input type="date" 
-                                    class="form-control" 
-                                    id="preferredDate" 
-                                    required>
-                                </div>
-                                <button type="submit" 
-                                class="btn btn-primary w-100">Submit Request</button>
-                            </form>
+                                <div id="contactMethodFeedback" class="invalid-feedback">Please select a contact method.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="preferredDate" class="form-label">Preferred Appointment Date</label>
+                                <input type="date" class="form-control" id="preferredDate" required aria-describedby="preferredDateFeedback">
+                                <div id="preferredDateFeedback" class="invalid-feedback">Please select a valid future date.</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100" id="submitBtn">Submit Request</button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -202,10 +189,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.7.4/lottie.min.js"></script>
     <script>
         $(document).ready(function() {
-            // Add loader-active class to body
+            // Loader
             $('body').addClass('loader-active');
-
-            // Initialize Lottie animation
             const animation = lottie.loadAnimation({
                 container: document.getElementById('lottie-animation'),
                 renderer: 'svg',
@@ -336,33 +321,89 @@
                     "markers": []
                 }
             });
-
-            // Hide loader and remove blur after 2 seconds
             setTimeout(() => {
                 $('#loader').addClass('hidden');
                 $('body').removeClass('loader-active');
             }, 2000);
 
-            // Handle form submission
+            // Set minimum date for appointment
+            const today = new Date().toISOString().split('T')[0];
+            $('#preferredDate').attr('min', today);
+
+            // Image preview
+            $('#image').change(function() {
+                const file = this.files[0];
+                if (file) {
+                    const maxSize = 5 * 1024 * 1024; // 5MB
+                    if (file.size > maxSize) {
+                        $('#image').addClass('is-invalid');
+                        $('#imageFeedback').text('Image size must be less than 5MB.');
+                        $('#imagePreview').hide();
+                        return;
+                    }
+                    if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
+                        $('#image').addClass('is-invalid');
+                        $('#imageFeedback').text('Only JPEG, PNG, or GIF images are allowed.');
+                        $('#imagePreview').hide();
+                        return;
+                    }
+                    $('#image').removeClass('is-invalid');
+                    $('#imageFeedback').text('');
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        $('#imagePreview').attr('src', e.target.result).show();
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    $('#imagePreview').hide();
+                }
+            });
+
+            // Form validation and submission
             $('#repairForm').submit(function(e) {
                 e.preventDefault();
-                const name = $('#name').val();
-                const email = $('#email').val();
-                const phone = $('#phone').val();
+                const form = this;
+                if (!form.checkValidity()) {
+                    e.stopPropagation();
+                    $(form).addClass('was-validated');
+                    return;
+                }
+
+                const name = $('#name').val().trim();
+                const email = $('#email').val().trim();
+                const phone = $('#phone').val().trim();
                 const deviceType = $('#deviceType').val();
-                const deviceModel = $('#deviceModel').val();
-                const issue = $('#issue').val();
+                const deviceModel = $('#deviceModel').val().trim();
+                const issue = $('#issue').val().trim();
                 const contactMethod = $('input[name="contactMethod"]:checked').val();
                 const preferredDate = $('#preferredDate').val();
                 const image = $('#image')[0].files[0];
 
-                // Basic validation (image is optional)
-                if (!name || !email || !phone || !deviceType || !deviceModel || !issue || !contactMethod || !preferredDate) {
-                    alert('Please fill out all required fields.');
+                // Additional validation
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    $('#email').addClass('is-invalid');
+                    $('#emailFeedback').text('Please enter a valid email address.');
+                    return;
+                }
+                const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+                if (!phoneRegex.test(phone)) {
+                    $('#phone').addClass('is-invalid');
+                    $('#phoneFeedback').text('Please enter a valid phone number (e.g., +2341234567890).');
+                    return;
+                }
+                const selectedDate = new Date(preferredDate);
+                if (selectedDate < new Date(today)) {
+                    $('#preferredDate').addClass('is-invalid');
+                    $('#preferredDateFeedback').text('Please select a future date.');
                     return;
                 }
 
-                // Prepare FormData for file upload
+                if (!confirm('Are you sure you want to submit this repair request?')) {
+                    return;
+                }
+
+                // Prepare FormData
                 const formData = new FormData();
                 formData.append('name', name);
                 formData.append('email', email);
@@ -376,26 +417,44 @@
                     formData.append('image', image);
                 }
 
+                // Disable submit button and show loading state
+                const $submitBtn = $('#submitBtn');
+                $submitBtn.prop('disabled', true).text('Submitting...');
+
+                // Optional authentication check (disabled by default)
+                const token = localStorage.getItem('token');
+                const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
                 // Send to backend
                 $.ajax({
                     url: '/api/repairs',
                     method: 'POST',
                     data: formData,
+                    headers: headers,
                     processData: false,
                     contentType: false,
                     success: function(response) {
-                        alert(response.message);
+                        alert(`Repair request submitted successfully! Your repair ID is ${response.repairId}.`);
                         $('#repairForm')[0].reset();
+                        $('#imagePreview').hide();
+                        $(form).removeClass('was-validated');
+                        $submitBtn.prop('disabled', false).text('Submit Request');
+                        window.location.href = 'dashboard.html';
                     },
                     error: function(err) {
-                        alert('Error submitting repair request. Please try again.');
+                        $submitBtn.prop('disabled', false).text('Submit Request');
+                        if (err.status === 401 && token) {
+                            localStorage.removeItem('token');
+                            alert('Session expired. Please login again.');
+                            window.location.href = 'login.html';
+                        } else if (err.status === 413) {
+                            alert('Image file is too large. Please upload an image under 5MB.');
+                        } else {
+                            alert(err.responseJSON?.message || 'Error submitting repair request. Please try again.');
+                        }
                     }
                 });
             });
-
-            // Set minimum date for appointment to today
-            const today = new Date().toISOString().split('T')[0];
-            $('#preferredDate').attr('min', today);
         });
     </script>
 </body>
