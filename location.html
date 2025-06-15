@@ -1,9 +1,12 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Our Location - Caleb Messiah Tech</title>
+    <meta name="description" content="Visit Caleb Messiah Tech at No 6 Truly Yours Plaza, Agungi, Lekki, Lagos State. Find our location on Google Maps!">
+    <meta name="keywords" content="Caleb Messiah Tech, location, tech repairs, Lagos, Agungi, Lekki">
+    <meta name="author" content="Caleb Messiah Tech">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
@@ -15,6 +18,9 @@
             position: relative;
             overflow-x: hidden;
             transition: filter 0.5s ease;
+        }
+        .loader-active body {
+            filter: blur(5px);
         }
         .navbar {
             background-color: #000000;
@@ -150,6 +156,21 @@
             width: 200px;
             height: 200px;
         }
+        .cart-list {
+            background: #E1F5FE;
+            color: #0D47A1;
+            padding: 15px;
+            right: 10px;
+            width: 300px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .cart-item-image {
+            max-width: 50px;
+            height: auto;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
         @media (max-width: 768px) {
             .location-section {
                 padding: 20px 0;
@@ -164,8 +185,11 @@
                 width: 150px;
                 height: 150px;
             }
-            #cartList {
+            .cart-list {
                 width: 250px;
+            }
+            .cart-item-image {
+                max-width: 40px;
             }
         }
     </style>
@@ -180,36 +204,33 @@
                 <source src="video.mp4" type="video/mp4">
                 Your browser does not support the video tag.
             </video>
-            <a class="navbar-brand" href="index.html"><img src="logo.png" alt="Caleb Messiah Logo"></a>
+            <a class="navbar-brand" href="index.html"><img src="logo.png" alt="Caleb Messiah Tech Logo"></a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
-                    <li class="nav-item"><a class="nav-link" href="products.html">Shop</a></li>
+                    <li class="nav-item"><a class="nav-link" href="products.html#shop">Shop</a></li>
                     <li class="nav-item"><a class="nav-link" href="index.html#services">Services</a></li>
                     <li class="nav-item"><a class="nav-link" href="index.html#about">About Us</a></li>
                     <li class="nav-item"><a class="nav-link" href="index.html#faqs">FAQs</a></li>
                     <li class="nav-item"><a class="nav-link" href="repair.html">Repair</a></li>
-                    <!-- NEW: Admin Dashboard link (hidden by default) -->
                     <li class="nav-item d-none" id="adminLink"><a class="nav-link" href="admin.html">Admin Dashboard</a></li>
-                    <!-- NEW: User Dropdown -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-user"></i> <span id="userName">Account</span>
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="dashboard.html">Dashboard</a></li>
-                            <li><a class="dropdown-item" href="#" id="logout">Logout</a></li>
+                        <ul class="dropdown-menu dropdown-menu-end" id="userDropdown">
+                            <li><a class="dropdown-item" href="login.html">Login</a></li>
+                            <li><a class="dropdown-item" href="register.html">Register</a></li>
                         </ul>
                     </li>
                     <li class="nav-item cart-icon">
                         <a href="#" id="cartIcon"><i class="fas fa-shopping-cart"></i><span id="cartCount">0</span></a>
-                        <!-- NEW: Cart Dropdown -->
-                        <div id="cartList" style="display: none; position: absolute; background: #fff; color: #000; padding: 10px; right: 0; top: 100%; width: 300px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); z-index: 1000;">
+                        <div id="cartList" class="cart-list" style="display: none; position: absolute; top: 100%;">
                             <h5>Cart Items</h5>
-                            <ul id="cartItems"></ul>
+                            <ul id="cartItems" class="list-unstyled"></ul>
                             <a href="cart.html" class="btn btn-primary btn-sm mt-2">View Cart</a>
                         </div>
                     </li>
@@ -225,6 +246,7 @@
                 <div class="col-md-8">
                     <div class="map-container">
                         <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3964.6508697457016!2d3.513972674992177!3d6.438863793552352!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x103bf68a0e96b99d%3A0x8a00b2a0dc09f03b!2sTruly%20Yours%20Plaza!5e0!3m2!1sen!2sng!4v1749813070668!5m2!1sen!2sng" width="100%" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+                        <p class="mt-2 text-muted" style="display: none;" id="mapFallback">Unable to load map. Please visit us at No 6 Truly Yours Plaza, Agungi, Lekki, Lagos State.</p>
                     </div>
                 </div>
             </div>
@@ -243,6 +265,7 @@
                         <li><a href="index.html#faqs">FAQs</a></li>
                         <li><a href="index.html#services">Services</a></li>
                         <li><a href="location.html">Location</a></li>
+                        <li>No 6 Truly Yours Plaza, Agungi, Lekki, Lagos State</li>
                     </ul>
                 </div>
                 <div class="col-md-4">
@@ -413,13 +436,26 @@
                 $('body').removeClass('loader-active');
             }, 2000);
 
-            // Cart functionality
-            let cart = JSON.parse(localStorage.getItem('cart')) || [];
-            let cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+            // Cart dropdown
+            let cart = [];
+            try {
+                cart = JSON.parse(localStorage.getItem('cart')) || [];
+            } catch (e) {
+                console.error('Error parsing cart:', e);
+            }
+            let cartCount = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
             $('#cartCount').text(cartCount);
             if (cart.length > 0) {
                 cart.forEach(item => {
-                    $('#cartItems').append(`<li>${item.name} - ₦${item.price.toLocaleString()} (Qty: ${item.quantity})</li>`);
+                    $('#cartItems').append(`
+                        <li class="mb-2 d-flex align-items-center">
+                            <img src="${item.image || 'images/default.png'}" alt="${item.name || 'Cart Item'}" class="cart-item-image">
+                            <div class="ms-2">
+                                <p class="mb-1">${item.name || 'Unknown Item'}</p>
+                                <p class="mb-0">₦${((item.price || 0) * (item.quantity || 1)).toLocaleString()} (Qty: ${item.quantity || 1})</p>
+                            </div>
+                        </li>
+                    `);
                 });
             } else {
                 $('#cartItems').append('<li>Your cart is empty.</li>');
@@ -436,7 +472,7 @@
                 }
             });
 
-            // User authentication
+            // Authentication check
             const token = localStorage.getItem('token');
             if (token) {
                 $.ajax({
@@ -445,21 +481,38 @@
                     headers: { 'Authorization': `Bearer ${token}` },
                     success: function(user) {
                         $('#userName').text(user.name.split(' ')[0]);
+                        $('#userDropdown').html(`
+                            <li><a class="dropdown-item" href="dashboard.html">Dashboard</a></li>
+                            <li><a class="dropdown-item" href="#" id="logout">Logout</a></li>
+                        `);
                         if (user.role === 'admin') {
                             $('#adminLink').removeClass('d-none');
                         }
                     },
                     error: function(err) {
                         $('#userName').text('Account');
+                        $('#userDropdown').html(`
+                            <li><a class="dropdown-item" href="login.html">Login</a></li>
+                            <li><a class="dropdown-item" href="register.html">Register</a></li>
+                        `);
+                        if (err.status === 401) {
+                            localStorage.removeItem('token');
+                            alert('Session expired. Please login again.');
+                        }
                     }
                 });
             }
 
             // Logout
-            $('#logout').click(function(e) {
+            $(document).on('click', '#logout', function(e) {
                 e.preventDefault();
                 localStorage.removeItem('token');
                 window.location.href = 'index.html';
+            });
+
+            // Map fallback
+            $('iframe').on('error', function() {
+                $('#mapFallback').show();
             });
         });
     </script>
