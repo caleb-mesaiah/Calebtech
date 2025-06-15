@@ -84,6 +84,7 @@
     <div class="auth-container">
         <h3 class="text-center mb-4" style="color: #1976D2;">Login</h3>
         <form id="loginForm">
+            <input type="hidden" id="csrfToken" name="_csrf">
             <div class="mb-3">
                 <label for="email" class="form-label">Email</label>
                 <input type="email" class="form-control" id="email" required>
@@ -111,12 +112,25 @@
                 $('body').removeClass('loader-active');
             }, 2000);
 
+            // Fetch CSRF token
+            $.ajax({
+                url: '/api/csrf-token',
+                method: 'GET',
+                success: function(response) {
+                    $('#csrfToken').val(response.csrfToken);
+                },
+                error: function(err) {
+                    alert('Error fetching CSRF token: ' + (err.responseJSON?.message || 'Please try again.'));
+                }
+            });
+
             // Login form submission
             $('#loginForm').submit(function(e) {
                 e.preventDefault();
                 const userData = {
                     email: $('#email').val(),
                     password: $('#password').val(),
+                    _csrf: $('#csrfToken').val()
                 };
                 $.ajax({
                     url: '/api/auth/login',
