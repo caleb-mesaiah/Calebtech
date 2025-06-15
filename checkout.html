@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://js.paystack.co/v1/inline.js"></script>
     <style>
         body { 
             font-family: 'Poppins', sans-serif; 
@@ -69,6 +70,14 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .bank-details p {
+            margin-bottom: 0.5rem;
+        }
+        .copy-btn {
+            margin-left: 10px;
+            font-size: 0.8rem;
+            padding: 2px 8px;
+        }
         @media (max-width: 768px) {
             .order-summary { 
                 font-size: 0.9rem; 
@@ -79,6 +88,10 @@
             }
             .checkout-section { 
                 padding: 20px 0; 
+            }
+            .copy-btn {
+                font-size: 0.7rem;
+                padding: 2px 6px;
             }
         }
     </style>
@@ -144,19 +157,6 @@
                                 <input class="form-check-input" type="radio" name="payment" id="card" value="card" required>
                                 <label class="form-check-label" for="card">Credit/Debit Card</label>
                             </div>
-                            <div class="card-details collapse" id="cardDetails">
-                                <div class="mt-2">
-                                    <input type="text" class="form-control mb-2" placeholder="Card Number" id="cardNumber">
-                                    <div class="row">
-                                        <div class="col">
-                                            <input type="text" class="form-control mb-2" placeholder="Expiry (MM/YY)" id="cardExpiry">
-                                        </div>
-                                        <div class="col">
-                                            <input type="text" class="form-control mb-2" placeholder="CVV" id="cardCVV">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="payment" id="bank" value="bank" required>
                                 <label class="form-check-label" for="bank">Bank Transfer</label>
@@ -165,13 +165,13 @@
                                 <div class="mt-2">
                                     <p><strong>Zenith Bank</strong></p>
                                     <p>Account Name: Caleb Basil Umoh</p>
-                                    <p>Account Number: 2406320043</p>
+                                    <p>Account Number: 2406320043 <button type="button" class="btn btn-sm btn-outline-primary copy-btn" data-account="2406320043">Copy</button></p>
                                     <p><strong>Eco Bank</strong></p>
                                     <p>Account Name: Caleb Basil Umoh</p>
-                                    <p>Account Number: 0320019864</p>
+                                    <p>Account Number: 0320019864 <button type="button" class="btn btn-sm btn-outline-primary copy-btn" data-account="0320019864">Copy</button></p>
                                     <p><strong>Moniepoint</strong></p>
                                     <p>Account Name: Caleb Basil Umoh</p>
-                                    <p>Account Number: 7040363679</p>
+                                    <p>Account Number: 7040363679 <button type="button" class="btn btn-sm btn-outline-primary copy-btn" data-account="7040363679">Copy</button></p>
                                 </div>
                             </div>
                             <div class="form-check">
@@ -194,7 +194,7 @@
                         <p>Subtotal: ₦<span id="subtotal">0</span></p>
                         <p>Delivery: ₦<span id="deliveryFee">0</span></p>
                         <p><strong>Total</strong>: ₦<span id="total">0</span></p>
-                        <button type="submit" form="checkoutForm" class="btn btn-primary w-100" style="background-color: #1976D2;">Place Order</button>
+                        <button type="submit" form="checkoutForm" class="btn btn-primary w-100" style="background-color: #1976D2;" id="placeOrderBtn">Place Order</button>
                     </div>
                 </div>
             </div>
@@ -216,6 +216,7 @@
             let cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
             let deliveryFee = 0;
             const token = localStorage.getItem('token');
+            const publicKey = 'pk_live_d78b8fd463798d9e7ad954066b5c8fa41867d569';
 
             // Check authentication
             if (token) {
@@ -224,7 +225,6 @@
                     method: 'GET',
                     headers: { 'Authorization': `Bearer ${token}` },
                     success: function(user) {
-                        // Pre-fill form
                         $('#name').val(user.name);
                         $('#email').val(user.email);
                         $('#phone').val(user.phone || '');
@@ -244,18 +244,12 @@
                 $('#authPrompt').addClass('d-none');
             });
 
-            // Logout (if needed elsewhere)
-            $(document).on('click', '#logout', function(e) {
-                e.preventDefault();
-                localStorage.removeItem('token');
-                window.location.href = 'index.html';
-            });
-
             function renderOrderSummary() {
                 const orderItems = $('#orderItems');
                 const subtotalEl = $('#subtotal');
                 const deliveryFeeEl = $('#deliveryFee');
                 const totalEl = $('#total');
+                const placeOrderBtn = $('#placeOrderBtn');
 
                 orderItems.empty();
 
@@ -263,7 +257,7 @@
 
                 if (cart.length === 0) {
                     orderItems.append('<p>Your cart is empty.</p>');
-                    $('#checkoutForm button').prop('disabled', true);
+                    placeOrderBtn.prop('disabled', true);
                 } else {
                     cart.forEach(item => {
                         const itemTotal = item.price * item.quantity;
@@ -279,7 +273,7 @@
                             </div>
                         `);
                     });
-                    $('#checkoutForm button').prop('disabled', false);
+                    placeOrderBtn.prop('disabled', false);
                 }
 
                 subtotalEl.text(subtotal.toLocaleString());
@@ -297,16 +291,13 @@
 
             $('input[name="payment"]').change(function() {
                 if ($('#card').is(':checked')) {
-                    $('#cardDetails').collapse('show');
                     $('#bankDetails').collapse('hide');
                     $('#podDetails').collapse('hide');
                 } else if ($('#bank').is(':checked')) {
                     $('#bankDetails').collapse('show');
-                    $('#cardDetails').collapse('hide');
                     $('#podDetails').collapse('hide');
                 } else if ($('#pod').is(':checked')) {
                     $('#podDetails').collapse('show');
-                    $('#cardDetails').collapse('hide');
                     $('#bankDetails').collapse('hide');
                 }
             });
@@ -317,12 +308,29 @@
                 renderOrderSummary();
             });
 
+            // Copy to clipboard functionality
+            $(document).on('click', '.copy-btn', function() {
+                const accountNumber = $(this).data('account');
+                const button = $(this);
+                
+                navigator.clipboard.writeText(accountNumber).then(() => {
+                    button.text('Copied!').addClass('btn-success').removeClass('btn-outline-primary');
+                    setTimeout(() => {
+                        button.text('Copy').removeClass('btn-success').addClass('btn-outline-primary');
+                    }, 2000);
+                }).catch(err => {
+                    alert('Failed to copy account number. Please try again.');
+                    console.error('Clipboard error:', err);
+                });
+            });
+
             $('#checkoutForm').submit(function(e) {
                 e.preventDefault();
                 if (cart.length === 0) {
                     alert('Your cart is empty.');
                     return;
                 }
+
                 const orderData = {
                     name: $('#name').val(),
                     email: $('#email').val(),
@@ -336,24 +344,97 @@
                     deliveryFee: deliveryFee,
                     total: parseFloat($('#total').text().replace(/,/g, '')),
                 };
-                $.ajax({
-                    url: '/api/orders',
-                    method: 'POST',
-                    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-                    contentType: 'application/json',
-                    data: JSON.stringify(orderData),
-                    success: function(response) {
-                        alert(`Order placed successfully with ${orderData.paymentMethod === 'pod' ? 'Payment on Delivery' : orderData.paymentMethod === 'card' ? 'Credit/Debit Card' : 'Bank Transfer'}! Order ID: ${response.order.orderId}`);
-                        cart = [];
-                        cartCount = 0;
-                        localStorage.setItem('cart', JSON.stringify(cart));
-                        renderOrderSummary();
-                        window.location.href = 'order-confirmation.html';
-                    },
-                    error: function(err) {
-                        alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
-                    }
-                });
+
+                const placeOrderBtn = $('#placeOrderBtn');
+                placeOrderBtn.prop('disabled', true).text('Processing...');
+
+                if (orderData.paymentMethod === 'card') {
+                    $.ajax({
+                        url: '/api/orders/initialize',
+                        method: 'POST',
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            email: orderData.email,
+                            amount: orderData.total * 100, // Convert to kobo
+                            metadata: {
+                                name: orderData.name,
+                                phone: orderData.phone,
+                                shippingAddress: orderData.shippingAddress,
+                                billingAddress: orderData.billingAddress,
+                                deliveryOption: orderData.deliveryOption,
+                                items: orderData.items
+                            }
+                        }),
+                        success: function(response) {
+                            const handler = PaystackPop.setup({
+                                key: publicKey,
+                                email: orderData.email,
+                                amount: orderData.total * 100,
+                                ref: response.transactionRef,
+                                metadata: {
+                                    name: orderData.name,
+                                    phone: orderData.phone
+                                },
+                                onClose: function() {
+                                    alert('Payment cancelled.');
+                                    placeOrderBtn.prop('disabled', false).text('Place Order');
+                                },
+                                callback: function(response) {
+                                    // Submit order after successful payment
+                                    $.ajax({
+                                        url: '/api/orders',
+                                        method: 'POST',
+                                        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                                        contentType: 'application/json',
+                                        data: JSON.stringify({
+                                            ...orderData,
+                                            transactionRef: response.reference
+                                        }),
+                                        success: function(orderResponse) {
+                                            alert(`Order placed successfully with Credit/Debit Card! Order ID: ${orderResponse.order.orderId}`);
+                                            cart = [];
+                                            cartCount = 0;
+                                            localStorage.setItem('cart', JSON.stringify(cart));
+                                            renderOrderSummary();
+                                            window.location.href = 'order-confirmation.html';
+                                        },
+                                        error: function(err) {
+                                            alert('Error: ' + (err.responseJSON?.message || 'Order creation failed.'));
+                                            placeOrderBtn.prop('disabled', false).text('Place Order');
+                                        }
+                                    });
+                                }
+                            });
+                            handler.openIframe();
+                        },
+                        error: function(err) {
+                            alert('Error: ' + (err.responseJSON?.message || 'Failed to initialize payment.'));
+                            placeOrderBtn.prop('disabled', false).text('Place Order');
+                        }
+                    });
+                } else {
+                    // Bank transfer or POD
+                    $.ajax({
+                        url: '/api/orders',
+                        method: 'POST',
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                        contentType: 'application/json',
+                        data: JSON.stringify(orderData),
+                        success: function(response) {
+                            alert(`Order placed successfully with ${orderData.paymentMethod === 'pod' ? 'Payment on Delivery' : 'Bank Transfer'}! Order ID: ${response.order.orderId}`);
+                            cart = [];
+                            cartCount = 0;
+                            localStorage.setItem('cart', JSON.stringify(cart));
+                            renderOrderSummary();
+                            window.location.href = 'order-confirmation.html';
+                        },
+                        error: function(err) {
+                            alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
+                            placeOrderBtn.prop('disabled', false).text('Place Order');
+                        }
+                    });
+                }
             });
 
             renderOrderSummary();
