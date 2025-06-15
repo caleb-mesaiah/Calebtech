@@ -1,2 +1,52 @@
-node_modules
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment variables
 .env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Uploads directory (repair images)
+public/Uploads/
+# NEW: Alternative case for consistency
+public/uploads/
+
+# Logs
+*.log
+logs/
+error.log
+access.log
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Testing
+coverage/
+.nyc_output/
+
+# Dependency lock files (if using Yarn)
+yarn.lock
+# NEW: Keep package-lock.json for npm consistency
+# package-lock.json
