@@ -304,9 +304,26 @@
             const token = localStorage.getItem('token');
             if (!token) {
                 alert('Please login as an admin to access this page.');
-                window.location.href = 'login.html';
+                window.location.href = '/login.html';
                 return;
             }
+
+            // Fetch CSRF token
+            let csrfToken;
+            $.ajax({
+                url: '/api/csrf-token',
+                method: 'GET',
+                async: false,
+                success: function(response) {
+                    csrfToken = response.csrfToken;
+                },
+                error: function(err) {
+                    alert('Error fetching CSRF token: ' + (err.responseJSON?.message || 'Please try again.'));
+                    localStorage.removeItem('token');
+                    window.location.href = '/login.html';
+                    return;
+                }
+            });
 
             // Verify admin role
             $.ajax({
@@ -317,14 +334,15 @@
                     if (user.role !== 'admin') {
                         alert('Access denied. Admin privileges required.');
                         localStorage.removeItem('token');
-                        window.location.href = 'index.html';
+                        window.location.href = '/index.html';
                         return;
                     }
                 },
                 error: function(err) {
-                    alert('Session expired. Please login again.');
+                    alert('Session expired or invalid token. Please login again.');
                     localStorage.removeItem('token');
-                    window.location.href = 'login.html';
+                    window.location.href = '/login.html';
+                    return;
                 }
             });
 
@@ -350,7 +368,7 @@
                                                     ${order.status}
                                                 </span>
                                             </div>
-                                            <p>Customer: ${order.name} (${order.email})</p>
+                                            <p>Customer: ${order.userId?.name || 'N/A'} (${order.userId?.email || 'N/A'})</p>
                                             <p>Date: ${new Date(order.createdAt).toLocaleDateString()}</p>
                                             <p>Total: ₦${order.total.toLocaleString()}</p>
                                             <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#orderDetails${order._id}">
@@ -368,7 +386,7 @@
                                                 <ul class="list-unstyled">
                                                     ${order.items.map(item => `
                                                         <li class="d-flex mb-2">
-                                                            <img src="${item.image || 'images/default.png'}" alt="${item.name}">
+                                                            <img src="${item.image || '/images/default.png'}" alt="${item.name}">
                                                             <div class="ms-2">
                                                                 <p class="mb-1">${item.name}</p>
                                                                 <p class="mb-1">Qty: ${item.quantity}</p>
@@ -379,10 +397,6 @@
                                                 </ul>
                                                 <h6>Shipping Address:</h6>
                                                 <p>${order.shippingAddress}</p>
-                                                <h6>Billing Address:</h6>
-                                                <p>${order.billingAddress}</p>
-                                                <h6>Payment Method:</h6>
-                                                <p>${order.paymentMethod === 'card' ? 'Credit/Debit Card' : order.paymentMethod === 'bank' ? 'Bank Transfer' : 'Payment on Delivery'}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -445,12 +459,13 @@
             // Fetch products
             function loadProducts() {
                 $.ajax({
-                    url: '/api/admin/products',
+                    url: '/api/products',
                     method: 'GET',
                     headers: { 'Authorization': `Bearer ${token}` },
-                    success: function(products) {
+                    success: function(response) {
                         const productList = $('#productList');
                         productList.empty();
+                        const products = response.products || [];
                         if (products.length === 0) {
                             productList.append('<p class="text-center">No products found.</p>');
                         } else {
@@ -459,7 +474,7 @@
                                     <div class="card" data-id="${product._id}">
                                         <div class="card-body">
                                             <div class="d-flex align-items-center mb-2">
-                                                <img src="${product.image || 'images/default.png'}" alt="${product.name}">
+                                                <img src="${product.image || '/images/default.png'}" alt="${product.name}">
                                                 <div class="ms-3">
                                                     <h5>${product.name}</h5>
                                                     <p>Price: ₦${product.price.toLocaleString()}</p>
@@ -504,10 +519,7 @@
                                             <p>Email: ${user.email}</p>
                                             <p>Role: ${user.role}</p>
                                             <p>Phone: ${user.phone || 'N/A'}</p>
-                                            <button class="btn btn-warning btn-sm edit-user" data-id="${user._id}" 
-                                                    data-name="${user.name}" data-email="${user.email}" 
-                                                    data-role="${user.role}" data-phone="${user.phone || ''}">Edit</button>
-                                            <button class="btn btn-danger btn-sm ms-2 delete-user" data-id="${user._id}">Delete</button>
+                                            <button class="btn btn-danger btn-sm delete-user" data-id="${user._id}">Delete</button>
                                         </div>
                                     </div>
                                 `;
@@ -528,28 +540,14 @@
                     method: 'GET',
                     headers: { 'Authorization': `Bearer ${token}` },
                     success: function(data) {
-                        $('#totalSales').text(`₦${data.totalSales.toLocaleString()}`);
+                        $('#totalSales').text(`₦${data.totalRevenue.toLocaleString()}`);
                         $('#totalOrders').text(data.totalOrders);
-                        $('#pendingOrders').text(data.pendingOrders);
-                        const topProducts = $('#topProducts');
-                        topProducts.empty();
-                        if (data.topProducts.length === 0) {
-                            topProducts.append('<li>No sales yet.</li>');
-                        } else {
-                            data.topProducts.forEach(product => {
-                                topProducts.append(`
-                                    <li class="mb-2">
-                                        ${product.name} - ${product.totalSold} units (₦${product.totalRevenue.toLocaleString()})
-                                    </li>
-                                `);
-                            });
-                        }
+                        $('#pendingOrders').text(data.totalOrders);
                     },
                     error: function(err) {
                         $('#totalSales').text('Error');
                         $('#totalOrders').text('Error');
                         $('#pendingOrders').text('Error');
-                        $('#topProducts').append('<li>Error loading analytics.</li>');
                     }
                 });
             }
@@ -565,7 +563,7 @@
                     method: 'PUT',
                     headers: { 'Authorization': `Bearer ${token}` },
                     contentType: 'application/json',
-                    data: JSON.stringify({ status }),
+                    data: JSON.stringify({ status, _csrf: csrfToken }),
                     success: function(response) {
                         alert(`${isRepair ? 'Repair' : 'Order'} status updated.`);
                         if (!isRepair) {
@@ -589,6 +587,8 @@
                     url: `/api/admin/orders/${orderId}`,
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` },
+                    contentType: 'application/json',
+                    data: JSON.stringify({ _csrf: csrfToken }),
                     success: function(response) {
                         alert('Order deleted.');
                         $(`[data-id="${orderId}"]`).remove();
@@ -608,6 +608,8 @@
                     url: `/api/admin/repairs/${repairId}`,
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` },
+                    contentType: 'application/json',
+                    data: JSON.stringify({ _csrf: csrfToken }),
                     success: function(response) {
                         alert('Repair deleted.');
                         $(`[data-id="${repairId}"]`).remove();
@@ -627,9 +629,10 @@
                     stock: parseInt($('#productStock').val()),
                     image: $('#productImage').val(),
                     description: $('#productDescription').val(),
+                    _csrf: csrfToken
                 };
                 $.ajax({
-                    url: '/api/admin/products',
+                    url: '/api/products',
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                     contentType: 'application/json',
@@ -666,9 +669,10 @@
                     stock: parseInt($('#editProductStock').val()),
                     image: $('#editProductImage').val(),
                     description: $('#editProductDescription').val(),
+                    _csrf: csrfToken
                 };
                 $.ajax({
-                    url: `/api/admin/products/${productId}`,
+                    url: `/api/products/${productId}`,
                     method: 'PUT',
                     headers: { 'Authorization': `Bearer ${token}` },
                     contentType: 'application/json',
@@ -689,87 +693,14 @@
                 if (!confirm('Are you sure you want to delete this product?')) return;
                 const productId = $(this).data('id');
                 $.ajax({
-                    url: `/api/admin/products/${productId}`,
+                    url: `/api/products/${productId}`,
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` },
+                    contentType: 'application/json',
+                    data: JSON.stringify({ _csrf: csrfToken }),
                     success: function(response) {
                         alert('Product deleted.');
                         $(`[data-id="${productId}"]`).remove();
-                    },
-                    error: function(err) {
-                        alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
-                    }
-                });
-            });
-
-            // Edit user
-            $(document).on('click', '.edit-user', function() {
-                const userId = $(this).data('id');
-                const name = $(this).data('name');
-                const email = $(this).data('email');
-                const role = $(this).data('role');
-                const phone = $(this).data('phone');
-                const modalHtml = `
-                    <div class="modal fade" id="editUserModal" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Edit User</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <form id="editUserForm">
-                                        <input type="hidden" id="editUserId" value="${userId}">
-                                        <div class="mb-3">
-                                            <label for="editUserName" class="form-label">Name</label>
-                                            <input type="text" class="form-control" id="editUserName" value="${name}" required>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="editUserEmail" class="form-label">Email</label>
-                                            <input type="email" class="form-control" id="editUserEmail" value="${email}" required>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="editUserPhone" class="form-label">Phone</label>
-                                            <input type="tel" class="form-control" id="editUserPhone" value="${phone}">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="editUserRole" class="form-label">Role</label>
-                                            <select class="form-control" id="editUserRole" required>
-                                                <option value="user" ${role === 'user' ? 'selected' : ''}>User</option>
-                                                <option value="admin" ${role === 'admin' ? 'selected' : ''}>Admin</option>
-                                            </select>
-                                        </div>
-                                        <button type="submit" class="btn btn-primary w-100">Update User</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                $('body').append(modalHtml);
-                $('#editUserModal').modal('show');
-            });
-
-            $(document).on('submit', '#editUserForm', function(e) {
-                e.preventDefault();
-                const userId = $('#editUserId').val();
-                const userData = {
-                    name: $('#editUserName').val(),
-                    email: $('#editUserEmail').val(),
-                    phone: $('#editUserPhone').val(),
-                    role: $('#editUserRole').val(),
-                };
-                $.ajax({
-                    url: `/api/admin/users/${userId}`,
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    contentType: 'application/json',
-                    data: JSON.stringify(userData),
-                    success: function(response) {
-                        alert('User updated.');
-                        $('#editUserModal').modal('hide');
-                        $('#editUserModal').remove();
-                        loadUsers();
                     },
                     error: function(err) {
                         alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
@@ -785,6 +716,8 @@
                     url: `/api/admin/users/${userId}`,
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` },
+                    contentType: 'application/json',
+                    data: JSON.stringify({ _csrf: csrfToken }),
                     success: function(response) {
                         alert('User deleted.');
                         $(`[data-id="${userId}"]`).remove();
@@ -799,7 +732,7 @@
             $('#logout').click(function(e) {
                 e.preventDefault();
                 localStorage.removeItem('token');
-                window.location.href = 'index.html';
+                window.location.href = '/index.html';
             });
 
             // Load initial data
