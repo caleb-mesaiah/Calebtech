@@ -106,16 +106,26 @@ app.post('/api/auth/register', async (req, res) => {
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'All fields are required' });
     }
-    const existingUser = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase();
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ message: 'Email already registered' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ name, email, password: hashedPassword, phone, address, role: 'user', likedProducts: [] });
+    const user = new User({
+      name,
+      email: normalizedEmail,
+      password: hashedPassword,
+      phone,
+      address,
+      role: 'user',
+      likedProducts: []
+    });
     await user.save();
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    res.status(201).json({ token, user: { id: user._id, name, email, role: user.role } });
+    res.status(201).json({ token, user: { id: user._id, name, email: normalizedEmail, role: user.role } });
   } catch (error) {
+    console.error('Register error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -123,26 +133,35 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Invalid credentials: User not found' });
     }
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Invalid credentials: Incorrect password' });
     }
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: user._id, name: user.name, email, role: user.role } });
+    res.json({
+      token,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error during login' });
   }
 });
 
 app.get('/api/auth/profile', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
     res.json(user);
   } catch (error) {
+    console.error('Profile error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -157,6 +176,7 @@ app.put('/api/auth/profile', authMiddleware, async (req, res) => {
     ).select('-password');
     res.json(user);
   } catch (error) {
+    console.error('Profile update error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -173,6 +193,7 @@ app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
     await user.save();
     res.json({ message: 'Password changed successfully' });
   } catch (error) {
+    console.error('Change password error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -180,12 +201,12 @@ app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    const resetLink = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password.html?token=${token}`;
+    const resetLink = `${process.env.APP_URL || 'https://calebtech.onrender.com'}/reset-password.html?token=${token}`;
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
@@ -194,6 +215,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     });
     res.json({ message: 'Password reset email sent' });
   } catch (error) {
+    console.error('Forgot password error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -203,10 +225,12 @@ app.post('/api/auth/reset-password', async (req, res) => {
     const { token, newPassword } = req.body;
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
     res.json({ message: 'Password reset successfully' });
   } catch (error) {
+    console.error('Reset password error:', error);
     res.status(400).json({ message: 'Invalid or expired token' });
   }
 });
@@ -226,6 +250,7 @@ app.get('/api/products', async (req, res) => {
     const products = await Product.find(query);
     res.json({ products });
   } catch (error) {
+    console.error('Get products error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -236,6 +261,7 @@ app.get('/api/products/:id', async (req, res) => {
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(product);
   } catch (error) {
+    console.error('Get product error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -247,6 +273,7 @@ app.post('/api/products', authMiddleware, adminMiddleware, validateProductInput,
     await product.save();
     res.status(201).json(product);
   } catch (error) {
+    console.error('Create product error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -262,6 +289,7 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, validateProductInp
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(product);
   } catch (error) {
+    console.error('Update product error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -272,6 +300,7 @@ app.delete('/api/products/:id', authMiddleware, adminMiddleware, async (req, res
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json({ message: 'Product deleted' });
   } catch (error) {
+    console.error('Delete product error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -289,6 +318,7 @@ app.post('/api/likes/:id', authMiddleware, csrfProtection, async (req, res) => {
     await user.save();
     res.json({ message: 'Product liked' });
   } catch (error) {
+    console.error('Like product error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -304,6 +334,7 @@ app.delete('/api/likes/:id', authMiddleware, csrfProtection, async (req, res) =>
     await user.save();
     res.json({ message: 'Product unliked' });
   } catch (error) {
+    console.error('Unlike product error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -334,6 +365,7 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
     });
     res.status(201).json(order);
   } catch (error) {
+    console.error('Create order error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -349,7 +381,7 @@ app.post('/api/orders/initialize', authMiddleware, async (req, res) => {
       {
         email,
         amount: amount * 100,
-        callback_url: process.env.APP_URL ? `${process.env.APP_URL}/checkout.html` : 'https://your-app.onrender.com/checkout.html'
+        callback_url: process.env.APP_URL ? `${process.env.APP_URL}/checkout.html` : 'https://calebtech.onrender.com/checkout.html'
       },
       {
         headers: {
@@ -361,6 +393,7 @@ app.post('/api/orders/initialize', authMiddleware, async (req, res) => {
     const { authorization_url, reference } = response.data.data;
     res.json({ authorization_url, reference });
   } catch (error) {
+    console.error('Initialize payment error:', error);
     res.status(500).json({ message: 'Error initializing payment' });
   }
 });
@@ -390,6 +423,7 @@ app.post('/api/paystack/webhook', async (req, res) => {
     }
     res.status(200).send('Webhook received');
   } catch (error) {
+    console.error('Webhook error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -399,6 +433,7 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
     const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
+    console.error('Get orders error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -408,6 +443,7 @@ app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) =
     const orders = await Order.find().sort({ createdAt: -1 }).populate('userId', 'name email');
     res.json(orders);
   } catch (error) {
+    console.error('Get admin orders error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -429,6 +465,7 @@ app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req, re
     });
     res.json(order);
   } catch (error) {
+    console.error('Update order error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -465,6 +502,7 @@ app.post('/api/repairs', upload.single('image'), authMiddleware, async (req, res
     });
     res.status(201).json(repair);
   } catch (error) {
+    console.error('Create repair error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -474,6 +512,7 @@ app.get('/api/repairs/user', authMiddleware, async (req, res) => {
     const repairs = await Repair.find({ userId: req.user.id }).sort({ createdAt: -1 });
     res.json(repairs);
   } catch (error) {
+    console.error('Get user repairs error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -483,6 +522,7 @@ app.get('/api/admin/repairs', authMiddleware, adminMiddleware, async (req, res) 
     const repairs = await Repair.find().sort({ createdAt: -1 }).populate('userId', 'name email');
     res.json(repairs);
   } catch (error) {
+    console.error('Get admin repairs error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -504,6 +544,7 @@ app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req, r
     });
     res.json(repair);
   } catch (error) {
+    console.error('Update repair error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -514,6 +555,7 @@ app.delete('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req
     if (!repair) return res.status(404).json({ message: 'Repair not found' });
     res.json({ message: 'Repair deleted' });
   } catch (error) {
+    console.error('Delete repair error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -524,6 +566,7 @@ app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) =>
     const users = await User.find().select('-password');
     res.json(users);
   } catch (error) {
+    console.error('Get users error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -534,6 +577,7 @@ app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, 
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.json({ message: 'User deleted' });
   } catch (error) {
+    console.error('Delete user error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -555,6 +599,7 @@ app.get('/api/admin/analytics', authMiddleware, adminMiddleware, async (req, res
       totalRevenue: totalRevenue[0]?.total || 0
     });
   } catch (error) {
+    console.error('Analytics error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
