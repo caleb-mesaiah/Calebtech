@@ -1,4 +1,4 @@
- const express = require('express');
+const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -19,9 +19,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, process.env.UPLOAD_DIR || 'public')));
-const csrfProtection = csurf({ cookie: { httpOnly: true, secure: process.env.NODE_ENV === 'production' } });
-app.use(csrfProtection, (err, req, res, next) => {
+
+// CSRF protection
+const csrfProtection = csurf({
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' // Added for better cookie handling
+  }
+});
+
+// CSRF error handler
+app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
+    console.error('CSRF token error:', err);
     return res.status(403).json({ message: 'Invalid CSRF token' });
   }
   next(err);
@@ -94,7 +105,7 @@ const validateProductInput = (req, res, next) => {
 };
 
 // CSRF Token Route
-app.get('/api/csrf-token', (req, res) => {
+app.get('/api/csrf-token', csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
@@ -130,9 +141,9 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', csrfProtection, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, _csrf } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
@@ -611,4 +622,4 @@ app.get('*', (req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`)); 
