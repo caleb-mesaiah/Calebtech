@@ -106,9 +106,15 @@ const validateProductInput = (req, res, next) => {
 
 // CSRF Token Route
 app.get('/api/csrf-token', csrfProtection, (req, res) => {
-  res.json({ csrfToken: req.csrfToken() });
+  try {
+    const token = req.csrfToken();
+    console.log('CSRF token generated:', token);
+    res.json({ csrfToken: token });
+  } catch (error) {
+    console.error('CSRF token generation error:', error);
+    res.status(500).json({ message: 'Failed to generate CSRF token' });
+  }
 });
-
 // Routes
 // User Authentication
 app.post('/api/auth/register', async (req, res) => {
