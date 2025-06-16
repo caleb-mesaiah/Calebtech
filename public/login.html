@@ -102,57 +102,62 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script>
-        $(document).ready(function() {
-            // Loader
-            $('body').addClass('loader-active');
-            setTimeout(() => {
-                $('#loader').addClass('hidden');
-                $('body').removeClass('loader-active');
-            }, 2000);
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  $(document).ready(function() {
+    // Loader
+    $('body').addClass('loader-active');
+    setTimeout(() => {
+      $('#loader').addClass('hidden');
+      $('body').removeClass('loader-active');
+    }, 2000);
 
-            // Fetch CSRF token
-            $.ajax({
-                url: '/api/csrf-token',
-                method: 'GET',
-                success: function(response) {
-                    $('#csrfToken').val(response.csrfToken);
-                },
-                error: function(err) {
-                    alert('Error fetching CSRF token: ' + (err.responseJSON?.message || 'Please try again.'));
-                }
-            });
+    // Fetch CSRF token
+    $.ajax({
+      url: '/api/csrf-token',
+      method: 'GET',
+      xhrFields: { withCredentials: true }, // Ensure cookies are sent
+      success: function(response) {
+        $('#csrfToken').val(response.csrfToken);
+        console.log('CSRF token fetched:', response.csrfToken);
+      },
+      error: function(err) {
+        console.error('CSRF token fetch error:', err);
+        alert('Error fetching CSRF token: ' + (err.responseJSON?.message || 'Please try again.'));
+      }
+    });
 
-            // Login form submission
-            $('#loginForm').submit(function(e) {
-                e.preventDefault();
-                const userData = {
-                    email: $('#email').val(),
-                    password: $('#password').val(),
-                    _csrf: $('#csrfToken').val()
-                };
-                $.ajax({
-                    url: '/api/auth/login',
-                    method: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify(userData),
-                    success: function(response) {
-                        localStorage.setItem('token', response.token);
-                        if (response.user.role === 'admin') {
-                            alert('Admin login successful!');
-                            window.location.href = '/admin.html';
-                        } else {
-                            alert('User login successful!');
-                            window.location.href = '/products.html';
-                        }
-                    },
-                    error: function(err) {
-                        alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
-                    }
-                });
-            });
-        });
-    </script>
-</body>
-</html>
+    // Login form submission
+    $('#loginForm').submit(function(e) {
+      e.preventDefault();
+      const userData = {
+        email: $('#email').val(),
+        password: $('#password').val(),
+        _csrf: $('#csrfToken').val()
+      };
+      console.log('Login data:', userData);
+      $.ajax({
+        url: '/api/auth/login',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(userData),
+        xhrFields: { withCredentials: true }, // Ensure cookies are sent
+        success: function(response) {
+          console.log('Login success:', response);
+          localStorage.setItem('token', response.token);
+          if (response.user.role === 'admin') {
+            alert('Admin login successful!');
+            window.location.href = '/admin.html';
+          } else {
+            alert('User login successful!');
+            window.location.href = '/products.html';
+          }
+        },
+        error: function(err) {
+          console.error('Login error:', err);
+          alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
+        }
+      });
+    });
+  });
+                    </script>
