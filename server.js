@@ -25,7 +25,7 @@ const csrfProtection = csurf({
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' // Added for better cookie handling
+    sameSite: 'lax'
   }
 });
 
@@ -115,6 +115,7 @@ app.get('/api/csrf-token', csrfProtection, (req, res) => {
     res.status(500).json({ message: 'Failed to generate CSRF token' });
   }
 });
+
 // Routes
 // User Authentication
 app.post('/api/auth/register', async (req, res) => {
@@ -215,24 +216,36 @@ app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', csrfProtection, async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, _csrf } = req.body;
+    console.log('Forgot password request:', { email, _csrf });
+    if (!email) {
+      console.warn('No email provided');
+      return res.status(400).json({ message: 'Email is required' });
+    }
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      console.warn('User not found for forgot password:', email);
+      return res.status(200).json({ message: 'Password reset email sent' });
     }
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    const resetLink = `${process.env.APP_URL || 'https://calebtech.onrender.com'}/reset-password.html?token=${token}`;
+    const resetToken = jwt.sign({ userId: user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const resetLink = `${process.env.APP_URL || 'https://calebtech.onrender.com'}/reset-password.html?token=${resetToken}`;
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: email,
+      to: user.email,
       subject: 'Password Reset Request',
       html: `<p>Click <a href="${resetLink}">here</a> to reset your password. Link expires in 1 hour.</p>`
     });
+    console.log('Password reset email sent to:', user.email);
     res.json({ message: 'Password reset email sent' });
   } catch (error) {
-    console.error('Forgot password error:', error);
+    console.error('Forgot password error:', {
+      message: error.message,
+      stack: error.stack,
+      email: req.body.email,
+      csrf: req.body._csrf
+    });
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -240,12 +253,22 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 app.post('/api/auth/reset-password', csrfProtection, async (req, res) => {
   try {
     const { token, password, _csrf } = req.body;
-    console.log('Reset password request:', { token, password: '***', _csrf });
+    console.log('Reset password request:', { token: token.slice(0, 10) + '...', password: '***', _csrf });
     if (!token || !password) {
       console.warn('Missing token or password');
       return res.status(400).json({ message: 'Token and password are required' });
     }
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log('JWT decoded:', { userId: decoded.userId });
+    } catch (jwtError) {
+      console.error('JWT verification error:', {
+        message: jwtError.message,
+        stack: jwtError.stack
+      });
+      return res.status(400).json({ message: 'Invalid or expired token' });
+    }
     const user = await User.findById(decoded.userId);
     if (!user) {
       console.warn('User not found for reset password:', decoded.userId);
@@ -260,7 +283,7 @@ app.post('/api/auth/reset-password', csrfProtection, async (req, res) => {
     console.error('Reset password error:', {
       message: error.message,
       stack: error.stack,
-      token: req.body.token,
+      token: req.body.token?.slice(0, 10) + '...',
       csrf: req.body._csrf
     });
     res.status(500).json({ message: 'Server error' });
