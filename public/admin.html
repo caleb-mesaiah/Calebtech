@@ -644,104 +644,292 @@
                         loadProducts();
                     },
                     error: function(err) {
-                        alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
-                    }
-                });
-            });
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    $(document).ready(function() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            alert('Please log in.');
+            window.location.href = '/login.html';
+            return;
+        }
 
-            // Edit product
-            $(document).on('click', '.edit-product', function() {
-                $('#editProductId').val($(this).data('id'));
-                $('#editProductName').val($(this).data('name'));
-                $('#editProductPrice').val($(this).data('price'));
-                $('#editProductStock').val($(this).data('stock'));
-                $('#editProductImage').val($(this).data('image'));
-                $('#editProductDescription').val($(this).data('description'));
-                $('#editProductModal').modal('show');
-            });
+        // Loader
+        $('#loader').removeClass('hidden');
+        setTimeout(() => $('#loader').addClass('hidden'), 2000);
 
-            $('#editProductForm').submit(function(e) {
-                e.preventDefault();
-                const productId = $('#editProductId').val();
-                const productData = {
-                    name: $('#editProductName').val(),
-                    price: parseFloat($('#editProductPrice').val()),
-                    stock: parseInt($('#editProductStock').val()),
-                    image: $('#editProductImage').val(),
-                    description: $('#editProductDescription').val(),
-                    _csrf: csrfToken
-                };
-                $.ajax({
-                    url: `/api/products/${productId}`,
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    contentType: 'application/json',
-                    data: JSON.stringify(productData),
-                    success: function(response) {
-                        alert('Product updated.');
-                        $('#editProductModal').modal('hide');
-                        loadProducts();
-                    },
-                    error: function(err) {
-                        alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
-                    }
-                });
-            });
+        // Fetch CSRF token
+        $.ajax({
+            url: '/api/csrf-token',
+            method: 'GET',
+            xhrFields: { withCredentials: true },
+            success: function(response) {
+                $('#csrfToken').val(response.csrfToken);
+                console.log('CSRF token fetched:', response.csrfToken);
+            },
+            error: function(err) {
+                console.error('CSRF token fetch error:', err);
+                alert('Error fetching CSRF token');
+            }
+        });
 
-            // Delete product
-            $(document).on('click', '.delete-product', function() {
-                if (!confirm('Are you sure you want to delete this product?')) return;
-                const productId = $(this).data('id');
-                $.ajax({
-                    url: `/api/products/${productId}`,
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    contentType: 'application/json',
-                    data: JSON.stringify({ _csrf: csrfToken }),
-                    success: function(response) {
-                        alert('Product deleted.');
-                        $(`[data-id="${productId}"]`).remove();
-                    },
-                    error: function(err) {
-                        alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
-                    }
-                });
-            });
-
-            // Delete user
-            $(document).on('click', '.delete-user', function() {
-                if (!confirm('Are you sure you want to delete this user?')) return;
-                const userId = $(this).data('id');
-                $.ajax({
-                    url: `/api/admin/users/${userId}`,
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    contentType: 'application/json',
-                    data: JSON.stringify({ _csrf: csrfToken }),
-                    success: function(response) {
-                        alert('User deleted.');
-                        $(`[data-id="${userId}"]`).remove();
-                    },
-                    error: function(err) {
-                        alert('Error: ' + (err.responseJSON?.message || 'Please try again.'));
-                    }
-                });
-            });
-
-            // Logout
-            $('#logout').click(function(e) {
-                e.preventDefault();
+        // Tab navigation
+        $('.nav-link').click(function(e) {
+            e.preventDefault();
+            if ($(this).attr('id') === 'logout') {
                 localStorage.removeItem('token');
                 window.location.href = '/index.html';
-            });
-
-            // Load initial data
-            loadOrders();
-            loadRepairs();
-            loadProducts();
-            loadUsers();
-            loadAnalytics();
+                return;
+            }
+            $('.nav-link').removeClass('active');
+            $(this).addClass('active');
+            $('.tab-content').addClass('d-none');
+            $(`#${$(this).data('tab')}`).removeClass('d-none');
+            window['load' + $(this).data('tab').charAt(0).toUpperCase() + $(this).data('tab').slice(1)]();
         });
-    </script>
+
+        // Load Orders
+        function loadOrders() {
+            $.ajax({
+                url: '/api/admin/orders',
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` },
+                success: function(data) {
+                    $('#orderList').empty();
+                    if (!data.length) {
+                        $('#orderList').append('<tr><td colspan="5">No orders found</td></tr>');
+                        return;
+                    }
+                    data.forEach(order => {
+                        $('#orderList').append(`
+                            <tr>
+                                <td>${order.orderId}</td>
+                                <td>${order.userId?.name || 'Unknown'}</td>
+                                <td>₦${order.total.toLocaleString()}</td>
+                                <td>
+                                    <select class="status-select order-status" data-id="${order._id}">
+                                        <option value="Processing" ${order.status === 'Processing' ? 'selected' : ''}>Processing</option>
+                                        <option value="Shipped" ${order.status === 'Shipped' ? 'selected' : ''}>Shipped</option>
+                                        <option value="Delivered" ${order.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+                                    </select>
+                                </td>
+                                <td><button class="btn btn-danger delete-order" data-id="${order._id}">Delete</button></td>
+                            </tr>
+                        `);
+                    });
+                },
+                error: function(err) {
+                    console.error('Load orders error:', err);
+                    $('#orderList').html('<tr><td colspan="5">Error loading orders</td></tr>');
+                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                }
+            });
+        }
+
+        // Load Repairs
+        function loadRepairs() {
+            $.ajax({
+                url: '/api/admin/repairs',
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` },
+                success: function(data) {
+                    $('#repairsTable').empty();
+                    if (!data.length) {
+                        $('#repairsTable').append('<tr><td colspan="5">No repairs found</td></tr>');
+                        return;
+                    }
+                    data.forEach(repair => {
+                        $('#repairsTable').append(`
+                            <tr>
+                                <td>${repair.repairId}</td>
+                                <td>${repair.userId?.name || 'Unknown'}</td>
+                                <td>${repair.deviceType} (${repair.deviceModel})</td>
+                                <td>
+                                    <select class="status-select repair-status" data-id="${repair._id}">
+                                        <option value="Pending" ${repair.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                                        <option value="In Progress" ${repair.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                                        <option value="Completed" ${repair.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                                    </select>
+                                </td>
+                                <td><button class="btn btn-danger delete-repair" data-id="${repair._id}">Delete</button></td>
+                            </tr>
+                        `);
+                    });
+                },
+                error: function(err) {
+                    console.error('Load repairs error:', err);
+                    $('#repairsTable').html('<tr><td colspan="5">Error loading repairs</td></tr>');
+                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                }
+            });
+        }
+
+        // Load Products
+        function loadProducts() {
+            $.ajax({
+                url: '/api/products',
+                method: 'GET',
+                success: function(data) {
+                    $('#productList').empty();
+                    if (!data.products.length) {
+                        $('#productList').append('<p>No products found</p>');
+                        return;
+                    }
+                    data.products.forEach(product => {
+                        $('#productList').append(`
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5>${product.name}</h5>
+                                    <p>${product.description}</p>
+                                    <p>Price: ₦${product.price.toLocaleString()}</p>
+                                    <p>Stock: ${product.stock}</p>
+                                    <button class="btn btn-danger delete-product" data-id="${product._id}">Delete</button>
+                                </div>
+                            </div>
+                        `);
+                    });
+                },
+                error: function(err) {
+                    console.error('Load products error:', err);
+                    $('#productList').html('<p>Error loading products</p>');
+                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                }
+            });
+        }
+
+        // Load Users
+        function loadUsers() {
+            $.ajax({
+                url: '/api/admin/users',
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` },
+                success: function(data) {
+                    $('#userList').empty();
+                    if (!data.length) {
+                        $('#userList').append('<tr><td colspan="3">No users found</td></tr>');
+                        return;
+                    }
+                    data.forEach(user => {
+                        $('#userList').append(`
+                            <tr>
+                                <td>${user.name}</td>
+                                <td>${user.email}</td>
+                                <td><button class="btn btn-danger delete-user" data-id="${user._id}">Delete</button></td>
+                            </tr>
+                        `);
+                    });
+                },
+                error: function(err) {
+                    console.error('Load users error:', err);
+                    $('#userList').html('<tr><td colspan="3">Error loading users</td></tr>');
+                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                }
+            });
+        }
+
+        // Load Analytics
+        function loadAnalytics() {
+            $.ajax({
+                url: '/api/admin/analytics',
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` },
+                success: function(data) {
+                    $('#totalSales').text(`₦${data.totalRevenue.toLocaleString()}`);
+                    $('#totalOrders').text(data.totalOrders);
+                    $('#pendingOrders').text(data.totalOrders); // Adjust if needed
+                },
+                error: function(err) {
+                    console.error('Load analytics error:', err);
+                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                }
+            });
+        }
+
+        // Add Product
+        $('#addProductForm').submit(function(e) {
+            e.preventDefault();
+            const productData = {
+                name: $('#name').val(),
+                description: $('#description').val(),
+                price: Number($('#price').val()),
+                brand: $('#brand').val(),
+                stock: Number($('#stock').val()),
+                image: $('#image').val(),
+                _csrf: $('#csrfToken').val()
+            };
+            $.ajax({
+                url: '/api/products',
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                contentType: 'application/json',
+                data: JSON.stringify(productData),
+                success: function(data) {
+                    $('#addProductModal').modal('hide');
+                    loadProducts();
+                    alert('Product added successfully');
+                },
+                error: function(err) {
+                    console.error('Add product error:', err);
+                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                }
+            });
+        });
+
+        // Update Status
+        $(document).on('change', '.status-select', function() {
+            const id = $(this).data('id');
+            const status = $(this).val();
+            const isOrder = $(this).hasClass('order-status');
+            const endpoint = isOrder ? 'orders' : 'repairs';
+            console.log(`Updating ${endpoint} status:`, { id, status });
+            $.ajax({
+                url: `/api/admin/${endpoint}/${id}`,
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}` },
+                contentType: 'application/json',
+                data: JSON.stringify({ status, _csrf: $('#csrfToken').val() }),
+                success: function(data) {
+                    console.log(`${endpoint} status updated:`, data);
+                    alert('Status updated successfully');
+                },
+                error: function(err) {
+                    console.error(`Update ${endpoint} status error:`, err);
+                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                }
+            });
+        });
+
+        // Delete Actions
+        $(document).on('click', '.delete-order, .delete-repair, .delete-product, .delete-user', function() {
+            const id = $(this).data('id');
+            const type = $(this).hasClass('delete-order') ? 'orders' :
+                         $(this).hasClass('delete-repair') ? 'repairs' :
+                         $(this).hasClass('delete-product') ? 'products' : 'users';
+            if (confirm(`Delete this ${type.slice(0, -1)}?`)) {
+                $.ajax({
+                    url: `/api/admin/${type}/${id}`,
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    data: { _csrf: $('#csrfToken').val() },
+                    success: function() {
+                        alert('Deleted successfully');
+                        if (type === 'orders') loadOrders();
+                        else if (type === 'repairs') loadRepairs();
+                        else if (type === 'products') loadProducts();
+                        else loadUsers();
+                    },
+                    error: function(err) {
+                        console.error(`Delete ${type} error:`, err);
+                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    }
+                });
+            }
+        });
+
+        // Initial load
+        loadOrders();
+    });
+</script>
 </body>
 </html>
