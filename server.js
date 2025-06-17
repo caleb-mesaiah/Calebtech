@@ -237,18 +237,33 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
-app.post('/api/auth/reset-password', async (req, res) => {
+app.post('/api/auth/reset-password', csrfProtection, async (req, res) => {
   try {
-    const { token, newPassword } = req.body;
+    const { token, password, _csrf } = req.body;
+    console.log('Reset password request:', { token, password: '***', _csrf });
+    if (!token || !password) {
+      console.warn('Missing token or password');
+      return res.status(400).json({ message: 'Token and password are required' });
+    }
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    user.password = await bcrypt.hash(newPassword, 10);
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      console.warn('User not found for reset password:', decoded.userId);
+      return res.status(400).json({ message: 'Invalid or expired token' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    user.password = hashedPassword;
     await user.save();
-    res.json({ message: 'Password reset successfully' });
+    console.log('Password reset successful for:', user.email);
+    res.json({ message: 'Password reset successful' });
   } catch (error) {
-    console.error('Reset password error:', error);
-    res.status(400).json({ message: 'Invalid or expired token' });
+    console.error('Reset password error:', {
+      message: error.message,
+      stack: error.stack,
+      token: req.body.token,
+      csrf: req.body._csrf
+    });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
