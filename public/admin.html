@@ -31,6 +31,10 @@
             width: 50px; 
             height: 50px; 
             object-fit: contain; 
+            transition: opacity 0.3s ease;
+        }
+        .card img[style*="opacity: 0"] {
+            opacity: 0;
         }
         .btn-primary { 
             background-color: #1976D2; 
@@ -101,6 +105,7 @@
             max-width: 100px; 
             height: auto; 
             border-radius: 5px; 
+            transition: opacity 0.3s ease;
         }
         @media (max-width: 768px) {
             .admin-section { 
@@ -223,7 +228,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="addProductForm">
+                    <form id="addProductForm" enctype="multipart/form-data">
                         <input type="hidden" id="csrfToken">
                         <div class="mb-3">
                             <label for="productName" class="form-label">Name</label>
@@ -238,8 +243,8 @@
                             <input type="number" class="form-control" id="productStock" required>
                         </div>
                         <div class="mb-3">
-                            <label for="productImage" class="form-label">Image URL</label>
-                            <input type="text" class="form-control" id="productImage">
+                            <label for="productImage" class="form-label">Product Image</label>
+                            <input type="file" class="form-control" id="productImage" name="image" accept="image/*">
                         </div>
                         <div class="mb-3">
                             <label for="productDescription" class="form-label">Description</label>
@@ -261,7 +266,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="editProductForm">
+                    <form id="editProductForm" enctype="multipart/form-data">
                         <input type="hidden" id="editProductId">
                         <input type="hidden" id="editCsrfToken">
                         <div class="mb-3">
@@ -277,8 +282,9 @@
                             <input type="number" class="form-control" id="editProductStock" required>
                         </div>
                         <div class="mb-3">
-                            <label for="editProductImage" class="form-label">Image URL</label>
-                            <input type="text" class="form-control" id="editProductImage">
+                            <label for="editProductImage" class="form-label">Product Image</label>
+                            <input type="file" class="form-control" id="editProductImage" name="image" accept="image/*">
+                            <small class="form-text text-muted">Leave blank to keep current image.</small>
                         </div>
                         <div class="mb-3">
                             <label for="editProductDescription" class="form-label">Description</label>
@@ -385,7 +391,7 @@
                                                 <ul class="list-unstyled">
                                                     ${order.items.map(item => `
                                                         <li class="d-flex mb-2">
-                                                            <img src="${item.image || '/images/default.png'}" alt="${item.name}">
+                                                            <img src="${item.image || '/images/default.png'}" alt="${item.name}" style="transition: opacity 0.3s ease;" onload="this.style.opacity='1';" style="opacity: 0;">
                                                             <div class="ms-2">
                                                                 <p class="mb-1">${item.name}</p>
                                                                 <p class="mb-1">Qty: ${item.quantity}</p>
@@ -441,7 +447,7 @@
                                             </select>
                                         </td>
                                         <td>
-                                            ${repair.image ? `<img src="${repair.image}" alt="Device Image" class="repair-image">` : 'No Image'}
+                                            ${repair.image ? `<img src="${repair.image}" alt="Device Image" class="repair-image" style="transition: opacity 0.3s ease;" onload="this.style.opacity='1';" style="opacity: 0;">` : 'No Image'}
                                         </td>
                                         <td>
                                             <button class="btn btn-danger btn-sm delete-repair" data-id="${repair._id}">Delete</button>
@@ -476,7 +482,7 @@
                                     <div class="card" data-id="${product._id}">
                                         <div class="card-body">
                                             <div class="d-flex align-items-center mb-2">
-                                                <img src="${product.image || '/images/default.png'}" alt="${product.name}">
+                                                <img src="${product.image || '/images/default.png'}" alt="${product.name}" style="transition: opacity 0.3s ease;" onload="this.style.opacity='1';" style="opacity: 0;">
                                                 <div class="ms-3">
                                                     <h5>${product.name}</h5>
                                                     <p>Price: ₦${product.price.toLocaleString()}</p>
@@ -568,6 +574,104 @@
                 });
             }
 
+            // Add product
+            $('#addProductForm').submit(function(e) {
+                e.preventDefault();
+                const formData = new FormData();
+                formData.append('name', $('#productName').val());
+                formData.append('price', parseFloat($('#productPrice').val()));
+                formData.append('stock', parseInt($('#productStock').val()));
+                formData.append('description', $('#productDescription').val());
+                formData.append('brand', 'Generic');
+                formData.append('_csrf', $('#csrfToken').val());
+                const imageFile = $('#productImage')[0].files[0];
+                if (imageFile) {
+                    formData.append('image', imageFile);
+                }
+                $.ajax({
+                    url: '/api/products',
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        alert('Product added.');
+                        $('#addProductModal').modal('hide');
+                        $('#addProductForm')[0].reset();
+                        loadProducts();
+                    },
+                    error: function(err) {
+                        console.error('Add product error:', err);
+                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    }
+                });
+            });
+
+            // Edit product
+            $(document).on('click', '.edit-product', function() {
+                $('#editProductId').val($(this).data('id'));
+                $('#editProductName').val($(this).data('name'));
+                $('#editProductPrice').val($(this).data('price'));
+                $('#editProductStock').val($(this).data('stock'));
+                $('#editProductDescription').val($(this).data('description'));
+                $('#editProductModal').modal('show');
+            });
+
+            $('#editProductForm').submit(function(e) {
+                e.preventDefault();
+                const productId = $('#editProductId').val();
+                const formData = new FormData();
+                formData.append('name', $('#editProductName').val());
+                formData.append('price', parseFloat($('#editProductPrice').val()));
+                formData.append('stock', parseInt($('#editProductStock').val()));
+                formData.append('description', $('#editProductDescription').val());
+                formData.append('brand', 'Generic');
+                formData.append('_csrf', $('#editCsrfToken').val());
+                const imageFile = $('#editProductImage')[0].files[0];
+                if (imageFile) {
+                    formData.append('image', imageFile);
+                }
+                $.ajax({
+                    url: `/api/products/${productId}`,
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        alert('Product updated.');
+                        $('#editProductModal').modal('hide');
+                        $('#editProductForm')[0].reset();
+                        loadProducts();
+                    },
+                    error: function(err) {
+                        console.error('Edit product error:', err);
+                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    }
+                });
+            });
+
+            // Delete product
+            $(document).on('click', '.delete-product', function() {
+                if (!confirm('Are you sure you want to delete this product?')) return;
+                const productId = $(this).data('id');
+                $.ajax({
+                    url: `/api/products/${productId}`,
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    data: { _csrf: $('#csrfToken').val() },
+                    success: function(response) {
+                        alert('Product deleted.');
+                        $(`[data-id="${productId}"]`).remove();
+                    },
+                    error: function(err) {
+                        console.error('Delete product error:', err);
+                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    }
+                });
+            });
+
             // Update status
             $(document).on('change', '.status-select', function() {
                 const id = $(this).data('id');
@@ -634,98 +738,6 @@
                     },
                     error: function(err) {
                         console.error('Delete repair error:', err);
-                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-                    }
-                });
-            });
-
-            // Add product
-            $('#addProductForm').submit(function(e) {
-                e.preventDefault();
-                const productData = {
-                    name: $('#productName').val(),
-                    price: parseFloat($('#productPrice').val()),
-                    stock: parseInt($('#productStock').val()),
-                    image: $('#productImage').val(),
-                    description: $('#productDescription').val(),
-                    brand: 'Generic', // Adjust as needed
-                    _csrf: $('#csrfToken').val()
-                };
-                $.ajax({
-                    url: '/api/products',
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    contentType: 'application/json',
-                    data: JSON.stringify(productData),
-                    success: function(response) {
-                        alert('Product added.');
-                        $('#addProductModal').modal('hide');
-                        $('#addProductForm')[0].reset();
-                        loadProducts();
-                    },
-                    error: function(err) {
-                        console.error('Add product error:', err);
-                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-                    }
-                });
-            });
-
-            // Edit product
-            $(document).on('click', '.edit-product', function() {
-                $('#editProductId').val($(this).data('id'));
-                $('#editProductName').val($(this).data('name'));
-                $('#editProductPrice').val($(this).data('price'));
-                $('#editProductStock').val($(this).data('stock'));
-                $('#editProductImage').val($(this).data('image'));
-                $('#editProductDescription').val($(this).data('description'));
-                $('#editProductModal').modal('show');
-            });
-
-            $('#editProductForm').submit(function(e) {
-                e.preventDefault();
-                const productId = $('#editProductId').val();
-                const productData = {
-                    name: $('#editProductName').val(),
-                    price: parseFloat($('#editProductPrice').val()),
-                    stock: parseInt($('#editProductStock').val()),
-                    image: $('#editProductImage').val(),
-                    description: $('#editProductDescription').val(),
-                    brand: 'Generic', // Adjust as needed
-                    _csrf: $('#editCsrfToken').val()
-                };
-                $.ajax({
-                    url: `/api/products/${productId}`,
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    contentType: 'application/json',
-                    data: JSON.stringify(productData),
-                    success: function(response) {
-                        alert('Product updated.');
-                        $('#editProductModal').modal('hide');
-                        loadProducts();
-                    },
-                    error: function(err) {
-                        console.error('Edit product error:', err);
-                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-                    }
-                });
-            });
-
-            // Delete product
-            $(document).on('click', '.delete-product', function() {
-                if (!confirm('Are you sure you want to delete this product?')) return;
-                const productId = $(this).data('id');
-                $.ajax({
-                    url: `/api/products/${productId}`,
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    data: { _csrf: $('#csrfToken').val() },
-                    success: function(response) {
-                        alert('Product deleted.');
-                        $(`[data-id="${productId}"]`).remove();
-                    },
-                    error: function(err) {
-                        console.error('Delete product error:', err);
                         alert('Error: ' + (err.responseJSON?.message || 'Server error'));
                     }
                 });
