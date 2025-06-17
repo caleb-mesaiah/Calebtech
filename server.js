@@ -14,11 +14,30 @@ const cloudinary = require('cloudinary').v2;
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: 'https://calebtech.onrender.com', credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+const csrfProtection = csurf({ cookie: { httpOnly: true, secure: process.env.NODE_ENV === 'production' } });
+
+// Configure Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Configure Multer with Cloudinary storage
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'calebtech/products',
+        allowed_formats: ['jpg', 'png', 'webp'],
+        transformation: [{ width: 500, height: 500, crop: 'limit' }]
+    }
+});
+const upload = multer({ storage });
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -85,24 +104,6 @@ const Product = mongoose.model('Product', ProductSchema);
 const Order = mongoose.model('Order', OrderSchema);
 const Repair = mongoose.model('Repair', RepairSchema);
 
-// Configure Cloudinary
-cloudinary.config({
-    cloud_name: 'Mycloud',
-    api_key: '749598988761185',
-    api_secret: 'XwAu-FGyHqwxh_Jv5e-3f3OmZFY'
-});
-
-// Configure Multer with Cloudinary storage
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'calebtech/products',
-        allowed_formats: ['jpg', 'png', 'webp'],
-        transformation: [{ width: 500, height: 500, crop: 'limit' }]
-    }
-});
-const upload = multer({ storage });
-
 // Nodemailer setup
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -112,16 +113,15 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// CSRF protection
-const csrfProtection = csurf({ cookie: true });
-
 // Middleware
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'No token provided' });
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
+        const user = await User.findById(decoded.id).select('-password');
+        if (!user) return res.status(401).json({ message: 'User not found' });
+        req.user = user;
         next();
     } catch (error) {
         console.error('JWT verification error:', error);
@@ -141,7 +141,7 @@ app.get('/api/csrf-token', csrfProtection, (req, res) => {
     res.json({ csrfToken: req.csrfToken() });
 });
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', csrfProtection, async (req, res) => {
     try {
         const { name, email, password, phone } = req.body;
         const existingUser = await User.findOne({ email });
@@ -157,7 +157,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', csrfProtection, async (req, res) => {
     try {
         const { email, password } = req.body;
         const user = await User.findOne({ email });
@@ -174,16 +174,14 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/auth/profile', authMiddleware, async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select('-password');
-        if (!user) return res.status(404).json({ message: 'User not found' });
-        res.json(user);
+        res.json(req.user);
     } catch (error) {
         console.error('Profile error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', csrfProtection, async (req, res) => {
     try {
         const { email } = req.body;
         const user = await User.findOne({ email });
@@ -206,7 +204,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     }
 });
 
-app.post('/api/auth/reset-password', async (req, res) => {
+app.post('/api/auth/reset-password', csrfProtection, async (req, res) => {
     try {
         const { token, newPassword } = req.body;
         const user = await User.findOne({
@@ -246,16 +244,16 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
-app.post('/api/products', authMiddleware, adminMiddleware, upload.single('image'), async (req, res) => {
+app.post('/api/products', authMiddleware, adminMiddleware, csrfProtection, upload.single('image'), async (req, res) => {
     try {
         const { name, description, price, brand, stock } = req.body;
         const image = req.file ? req.file.path : null;
         const newProduct = new Product({
             name,
             description,
-            price,
+            price: parseFloat(price),
             brand,
-            stock,
+            stock: parseInt(stock),
             image
         });
         await newProduct.save();
@@ -266,15 +264,15 @@ app.post('/api/products', authMiddleware, adminMiddleware, upload.single('image'
     }
 });
 
-app.put('/api/products/:id', authMiddleware, adminMiddleware, upload.single('image'), async (req, res) => {
+app.put('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection, upload.single('image'), async (req, res) => {
     try {
         const { name, description, price, brand, stock } = req.body;
         const updateData = {
             name,
             description,
-            price,
+            price: parseFloat(price),
             brand,
-            stock
+            stock: parseInt(stock)
         };
         if (req.file) {
             updateData.image = req.file.path;
@@ -288,7 +286,7 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, upload.single('ima
     }
 });
 
-app.delete('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
+app.delete('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
         const product = await Product.findByIdAndDelete(req.params.id);
         if (!product) return res.status(404).json({ message: 'Product not found' });
@@ -299,19 +297,19 @@ app.delete('/api/products/:id', authMiddleware, adminMiddleware, async (req, res
     }
 });
 
-app.post('/api/orders', authMiddleware, async (req, res) => {
+app.post('/api/orders', authMiddleware, csrfProtection, async (req, res) => {
     try {
         const { items, total, shippingAddress } = req.body;
         const orderId = `ORD${Date.now()}`;
         const order = new Order({
             orderId,
-            userId: req.user.id,
+            userId: req.user._id,
             items,
-            total,
+            total: parseFloat(total),
             shippingAddress
         });
         await order.save();
-        const user = await User.findById(req.user.id);
+        const user = await User.findById(req.user._id);
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: user.email,
@@ -328,7 +326,7 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
 
 app.get('/api/orders', authMiddleware, async (req, res) => {
     try {
-        const orders = await Order.find({ userId: req.user.id }).populate('userId', 'name email');
+        const orders = await Order.find({ userId: req.user._id }).populate('userId', 'name email');
         res.json(orders);
     } catch (error) {
         console.error('Get orders error:', error);
@@ -336,7 +334,7 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
     }
 });
 
-app.post('/api/repairs', async (req, res) => {
+app.post('/api/repairs', csrfProtection, async (req, res) => {
     try {
         const { userId, name, email, phone, deviceType, deviceModel, issue, contactMethod, preferredDate, image } = req.body;
         const repairId = `REP${Date.now()}`;
@@ -378,7 +376,7 @@ app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) =
     }
 });
 
-app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
+app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
         const { status } = req.body;
         const order = await Order.findByIdAndUpdate(
@@ -401,7 +399,7 @@ app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req, re
     }
 });
 
-app.delete('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
+app.delete('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
         const order = await Order.findByIdAndDelete(req.params.id);
         if (!order) return res.status(404).json({ message: 'Order not found' });
@@ -422,7 +420,7 @@ app.get('/api/admin/repairs', authMiddleware, adminMiddleware, async (req, res) 
     }
 });
 
-app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req, res) => {
+app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
         const { status } = req.body;
         const repair = await Repair.findByIdAndUpdate(
@@ -445,7 +443,7 @@ app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req, r
     }
 });
 
-app.delete('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req, res) => {
+app.delete('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
         const repair = await Repair.findByIdAndDelete(req.params.id);
         if (!repair) return res.status(404).json({ message: 'Repair not found' });
@@ -466,7 +464,7 @@ app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) =>
     }
 });
 
-app.put('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+app.put('/api/admin/users/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
         const { name, email, phone, role } = req.body;
         const user = await User.findByIdAndUpdate(
@@ -482,7 +480,7 @@ app.put('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res
     }
 });
 
-app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
         const user = await User.findByIdAndDelete(req.params.id);
         if (!user) return res.status(404).json({ message: 'User not found' });
@@ -516,4 +514,4 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`)); 
