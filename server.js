@@ -69,8 +69,12 @@ const UserSchema = new mongoose.Schema({
     password: { type: String, required: true },
     role: { type: String, default: 'user' },
     phone: String,
+    address: String,
+    likedProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     resetPasswordToken: String,
-    resetPasswordExpires: Date
+    resetPasswordExpires: Date,
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
 });
 
 const ProductSchema = new mongoose.Schema({
@@ -160,7 +164,7 @@ const authMiddleware = async (req, res, next) => {
 
 const adminMiddleware = (req, res, next) => {
     console.log('Admin middleware: User role', req.user.role);
-    if (!req.user.role) {
+    if (req.user.role !== 'admin') {
         return res.status(403).json({ message: 'Admin access required' });
     }
     next();
@@ -632,4 +636,4 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`)); 
