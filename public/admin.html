@@ -318,18 +318,53 @@
 
             // Fetch CSRF token
             $.ajax({
-                url: '/api/csrf-token',
-                method: 'GET',
-                xhrFields: { withCredentials: true },
-                success: function(response) {
-                    $('#csrfToken, #editCsrfToken').val(response.csrfToken);
-                    console.log('CSRF token fetched:', response.csrfToken);
-                },
-                error: function(err) {
-                    console.error('CSRF token fetch error:', err);
-                    alert('Error fetching CSRF token. Please refresh the page.');
-                }
-            });
+    url: '/api/csrf-token',
+    method: 'GET',
+    xhrFields: { withCredentials: true },
+    success: function(response) {
+        $('#csrfToken, #editCsrfToken, #editUserCsrfToken').val(response.csrfToken);
+        console.log('CSRF token fetched:', response.csrfToken);
+    },
+    error: function(err) {
+        console.error('CSRF token fetch error:', err);
+        alert('Error fetching CSRF token. Please refresh the page.');
+    }
+});
+
+$('#addProductForm').submit(function(e) {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append('name', $('#productName').val());
+    formData.append('price', parseFloat($('#productPrice').val()));
+    formData.append('stock', parseInt($('#productStock').val()));
+    formData.append('description', $('#productDescription').val());
+    formData.append('brand', 'Generic');
+    const imageFile = $('#productImage')[0].files[0];
+    if (imageFile) {
+        formData.append('image', imageFile);
+    }
+    $.ajax({
+        url: '/api/products',
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-CSRF-Token': $('#csrfToken').val()
+        },
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            alert('Product added.');
+            $('#addProductModal').modal('hide');
+            $('#addProductForm')[0].reset();
+            loadProducts();
+        },
+        error: function(err) {
+            console.error('Add product error:', err);
+            alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+        }
+    });
+});
 
             // Verify admin role
             $.ajax({
