@@ -14,15 +14,46 @@ const cloudinary = require('cloudinary').v2;
 const app = express();
 
 // Middleware
-app.use(cors({ origin: 'https://calebtech.onrender.com', credentials: true }));
+app.use(cors({
+    origin: 'https://calebtech.onrender.com',
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-const csrfProtection = csurf({ cookie: { httpOnly: true, secure: true } });
+
+// CSRF middleware with enhanced logging
+const csrfProtection = csurf({
+    cookie: {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        key: '_csrf'
+    }
+});
 app.use((req, res, next) => {
-    console.log('Request CSRF token:', req.headers['x-csrf-token']);
+    console.log('Request Headers:', {
+        'X-CSRF-Token': req.headers['x-csrf-token'],
+        'Cookie': req.headers.cookie
+    });
     next();
+});
+
+// CSRF error handler
+app.use((err, req, res, next) => {
+    if (err.code === 'EBADCSRFTOKEN') {
+        console.error('CSRF Error:', {
+            message: err.message,
+            tokenReceived: req.headers['x-csrf-token'],
+            cookie: req.headers.cookie,
+            bodyToken: req.body._csrf
+        });
+        return res.status(403).json({ message: 'Invalid CSRF token' });
+    }
+    next(err);
 });
 
 // Log environment variables (mask sensitive values)
@@ -181,6 +212,7 @@ app.get('/api/csrf-token', csrfProtection, (req, res) => {
 
 app.post('/api/auth/register', csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for register');
         const { name, email, password, phone } = req.body;
         console.log('Register attempt:', email);
         const existingUser = await User.findOne({ email });
@@ -202,6 +234,7 @@ app.post('/api/auth/register', csrfProtection, async (req, res) => {
 
 app.post('/api/auth/login', csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for login');
         const { email, password } = req.body;
         console.log('Login attempt:', email);
         const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
@@ -235,11 +268,10 @@ app.get('/api/auth/profile', authMiddleware, async (req, res) => {
 
 app.post('/api/auth/forgot-password', csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for forgot-password');
         const { email } = req.body;
         console.log('Forgot password request:', email);
         const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
-        console.log('Query result:', user);
-        console.log('All users:', await mongoose.connection.db.collection('users').find({}).toArray());
         if (!user) {
             console.log('Forgot password: User not found', email);
             return res.status(404).json({ message: 'User not found' });
@@ -265,6 +297,7 @@ app.post('/api/auth/forgot-password', csrfProtection, async (req, res) => {
 
 app.post('/api/auth/reset-password', csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for reset-password');
         const { token, newPassword } = req.body;
         console.log('Reset password attempt with token:', token);
         const user = await User.findOne({
