@@ -318,53 +318,18 @@
 
             // Fetch CSRF token
             $.ajax({
-    url: '/api/csrf-token',
-    method: 'GET',
-    xhrFields: { withCredentials: true },
-    success: function(response) {
-        $('#csrfToken, #editCsrfToken, #editUserCsrfToken').val(response.csrfToken);
-        console.log('CSRF token fetched:', response.csrfToken);
-    },
-    error: function(err) {
-        console.error('CSRF token fetch error:', err);
-        alert('Error fetching CSRF token. Please refresh the page.');
-    }
-});
-
-$('#addProductForm').submit(function(e) {
-    e.preventDefault();
-    const formData = new FormData();
-    formData.append('name', $('#productName').val());
-    formData.append('price', parseFloat($('#productPrice').val()));
-    formData.append('stock', parseInt($('#productStock').val()));
-    formData.append('description', $('#productDescription').val());
-    formData.append('brand', 'Generic');
-    const imageFile = $('#productImage')[0].files[0];
-    if (imageFile) {
-        formData.append('image', imageFile);
-    }
-    $.ajax({
-        url: '/api/products',
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-CSRF-Token': $('#csrfToken').val()
-        },
-        data: formData,
-        processData: false,
-        contentType: false,
-        success: function(response) {
-            alert('Product added.');
-            $('#addProductModal').modal('hide');
-            $('#addProductForm')[0].reset();
-            loadProducts();
-        },
-        error: function(err) {
-            console.error('Add product error:', err);
-            alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-        }
-    });
-});
+                url: '/api/csrf-token',
+                method: 'GET',
+                xhrFields: { withCredentials: true },
+                success: function(response) {
+                    $('#csrfToken, #editCsrfToken, #editUserCsrfToken').val(response.csrfToken);
+                    console.log('CSRF token fetched:', response.csrfToken);
+                },
+                error: function(err) {
+                    console.error('CSRF token fetch error:', err);
+                    alert('Error fetching CSRF token. Please refresh the page.');
+                }
+            });
 
             // Verify admin role
             $.ajax({
@@ -618,7 +583,6 @@ $('#addProductForm').submit(function(e) {
                 formData.append('stock', parseInt($('#productStock').val()));
                 formData.append('description', $('#productDescription').val());
                 formData.append('brand', 'Generic');
-                formData.append('_csrf', $('#csrfToken').val());
                 const imageFile = $('#productImage')[0].files[0];
                 if (imageFile) {
                     formData.append('image', imageFile);
@@ -626,7 +590,10 @@ $('#addProductForm').submit(function(e) {
                 $.ajax({
                     url: '/api/products',
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-CSRF-Token': $('#csrfToken').val()
+                    },
                     data: formData,
                     processData: false,
                     contentType: false,
@@ -662,7 +629,6 @@ $('#addProductForm').submit(function(e) {
                 formData.append('stock', parseInt($('#editProductStock').val()));
                 formData.append('description', $('#editProductDescription').val());
                 formData.append('brand', 'Generic');
-                formData.append('_csrf', $('#editCsrfToken').val());
                 const imageFile = $('#editProductImage')[0].files[0];
                 if (imageFile) {
                     formData.append('image', imageFile);
@@ -670,7 +636,10 @@ $('#addProductForm').submit(function(e) {
                 $.ajax({
                     url: `/api/products/${productId}`,
                     method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-CSRF-Token': $('#editCsrfToken').val()
+                    },
                     data: formData,
                     processData: false,
                     contentType: false,
@@ -694,8 +663,10 @@ $('#addProductForm').submit(function(e) {
                 $.ajax({
                     url: `/api/products/${productId}`,
                     method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    data: { _csrf: $('#csrfToken').val() },
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-CSRF-Token': $('#csrfToken').val()
+                    },
                     success: function(response) {
                         alert('Product deleted.');
                         $(`[data-id="${productId}"]`).remove();
@@ -707,7 +678,7 @@ $('#addProductForm').submit(function(e) {
                 });
             });
 
-            // Update status
+            // Update status (orders and repairs)
             $(document).on('change', '.status-select', function() {
                 const id = $(this).data('id');
                 const status = $(this).val();
@@ -717,9 +688,12 @@ $('#addProductForm').submit(function(e) {
                 $.ajax({
                     url: `/api/admin/${endpoint}/${id}`,
                     method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-CSRF-Token': $('#csrfToken').val()
+                    },
                     contentType: 'application/json',
-                    data: JSON.stringify({ status, _csrf: $('#csrfToken').val() }),
+                    data: JSON.stringify({ status }),
                     success: function(response) {
                         console.log(`${endpoint} status updated:`, response);
                         alert(`${isOrder ? 'Order' : 'Repair'} status updated.`);
@@ -744,8 +718,10 @@ $('#addProductForm').submit(function(e) {
                 $.ajax({
                     url: `/api/admin/orders/${orderId}`,
                     method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    data: { _csrf: $('#csrfToken').val() },
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-CSRF-Token': $('#csrfToken').val()
+                    },
                     success: function(response) {
                         alert('Order deleted.');
                         $(`[data-id="${orderId}"]`).remove();
@@ -765,8 +741,10 @@ $('#addProductForm').submit(function(e) {
                 $.ajax({
                     url: `/api/admin/repairs/${repairId}`,
                     method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    data: { _csrf: $('#csrfToken').val() },
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-CSRF-Token': $('#csrfToken').val()
+                    },
                     success: function(response) {
                         alert('Repair deleted.');
                         $(`[data-id="${repairId}"]`).remove();
@@ -791,582 +769,110 @@ $('#addProductForm').submit(function(e) {
                             <div class="modal-content">
                                 <div class="modal-header">
                                     <h5 class="modal-title">Edit User</h5>
-               <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    $(document).ready(function() {
-        // Loader
-        $('body').addClass('loader-active');
-        setTimeout(() => {
-            $('#loader').addClass('hidden');
-            $('body').removeClass('loader-active');
-        }, 2000);
-
-        // Authentication check
-        const token = localStorage.getItem('token');
-        if (!token) {
-            alert('Please login as an admin to access this page.');
-            window.location.href = 'login.html';
-            return;
-        }
-
-        // Fetch CSRF token
-        $.ajax({
-            url: '/api/csrf-token',
-            method: 'GET',
-            xhrFields: { withCredentials: true },
-            success: function(response) {
-                $('#csrfToken, #editCsrfToken, #editUserCsrfToken').val(response.csrfToken);
-                console.log('CSRF token fetched:', response.csrfToken);
-            },
-            error: function(err) {
-                console.error('CSRF token fetch error:', err);
-                alert('Error fetching CSRF token. Please refresh the page.');
-            }
-        });
-
-        // Verify admin role
-        $.ajax({
-            url: '/api/auth/profile',
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` },
-            success: function(user) {
-                if (user.role !== 'admin') {
-                    alert('Access denied. Admin privileges required.');
-                    localStorage.removeItem('token');
-                    window.location.href = 'index.html';
-                    return;
-                }
-            },
-            error: function(err) {
-                alert('Session expired. Please login again.');
-                localStorage.removeItem('token');
-                window.location.href = 'login.html';
-            }
-        });
-
-        // Fetch orders
-        function loadOrders() {
-            $.ajax({
-                url: '/api/admin/orders',
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${token}` },
-                success: function(orders) {
-                    const orderList = $('#orderList');
-                    orderList.empty();
-                    if (orders.length === 0) {
-                        orderList.append('<p class="text-center">No orders found.</p>');
-                    } else {
-                        orders.forEach(order => {
-                            const orderHtml = `
-                                <div class="card" data-id="${order._id}">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <h5>Order #${order.orderId}</h5>
-                                            <span class="badge bg-${order.status === 'Delivered' ? 'success' : order.status === 'Shipped' ? 'info' : order.status === 'Processing' ? 'warning' : 'secondary'}">
-                                                ${order.status}
-                                            </span>
-                                        </div>
-                                        <p>Customer: ${order.userId?.name || 'Unknown'} (${order.userId?.email || 'N/A'})</p>
-                                        <p>Date: ${new Date(order.createdAt).toLocaleDateString()}</p>
-                                        <p>Total: ₦${order.total.toLocaleString()}</p>
-                                        <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#orderDetails${order._id}">
-                                            View Details
-                                        </button>
-                                        <select class="status-select order-status" data-id="${order._id}">
-                                            <option value="Pending" ${order.status === 'Pending' ? 'selected' : ''}>Pending</option>
-                                            <option value="Processing" ${order.status === 'Processing' ? 'selected' : ''}>Processing</option>
-                                            <option value="Shipped" ${order.status === 'Shipped' ? 'selected' : ''}>Shipped</option>
-                                            <option value="Delivered" ${order.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
-                                        </select>
-                                        <button class="btn btn-danger btn-sm ms-2 delete-order" data-id="${order._id}">Delete</button>
-                                        <div class="collapse mt-3" id="orderDetails${order._id}">
-                                            <h6>Items:</h6>
-                                            <ul class="list-unstyled">
-                                                ${order.items.map(item => `
-                                                    <li class="d-flex mb-2">
-                                                        <img src="${item.image || '/images/default.png'}" alt="${item.name}" style="transition: opacity 0.3s ease;" onload="this.style.opacity='1';" style="opacity: 0;">
-                                                        <div class="ms-2">
-                                                            <p class="mb-1">${item.name}</p>
-                                                            <p class="mb-1">Qty: ${item.quantity}</p>
-                                                            <p class="mb-1">₦${(item.price * item.quantity).toLocaleString()}</p>
-                                                        </div>
-                                                    </li>
-                                                `).join('')}
-                                            </ul>
-                                            <h6>Shipping Address:</h6>
-                                            <p>${order.shippingAddress || 'N/A'}</p>
-                                        </div>
-                                    </div>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                 </div>
-                            `;
-                            orderList.append(orderHtml);
-                        });
-                    }
-                },
-                error: function(err) {
-                    console.error('Load orders error:', err);
-                    $('#orderList').append('<p class="text-center">Error loading orders.</p>');
-                    alert('Error loading orders: ' + (err.responseJSON?.message || 'Server error'));
-                }
-            });
-        }
-
-        // Fetch repairs
-        function loadRepairs() {
-            $.ajax({
-                url: '/api/admin/repairs',
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${token}` },
-                success: function(repairs) {
-                    const repairsTable = $('#repairsTableBody');
-                    repairsTable.empty();
-                    if (repairs.length === 0) {
-                        repairsTable.append('<tr><td colspan="9" class="text-center">No repairs found.</td></tr>');
-                    } else {
-                        repairs.forEach(repair => {
-                            repairsTable.append(`
-                                <tr data-id="${repair._id}">
-                                    <td>${repair.repairId}</td>
-                                    <td>${repair.name} (${repair.email})</td>
-                                    <td>${repair.deviceType} (${repair.deviceModel})</td>
-                                    <td>${repair.issue}</td>
-                                    <td>${repair.contactMethod}</td>
-                                    <td>${new Date(repair.preferredDate).toLocaleDateString()}</td>
-                                    <td>
-                                        <select class="status-select repair-status" data-id="${repair._id}">
-                                            <option value="Pending" ${repair.status === 'Pending' ? 'selected' : ''}>Pending</option>
-                                            <option value="In Progress" ${repair.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
-                                            <option value="Completed" ${repair.status === 'Completed' ? 'selected' : ''}>Completed</option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        ${repair.image ? `<img src="${repair.image}" alt="Device Image" class="repair-image" style="transition: opacity 0.3s ease;" onload="this.style.opacity='1';" style="opacity: 0;">` : 'No Image'}
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-danger btn-sm delete-repair" data-id="${repair._id}">Delete</button>
-                                    </td>
-                                </tr>
-                            `);
-                        });
-                    }
-                },
-                error: function(err) {
-                    console.error('Load repairs error:', err);
-                    $('#repairsTableBody').append('<tr><td colspan="9" class="text-center">Error loading repairs.</td></tr>');
-                    alert('Error loading repairs: ' + (err.responseJSON?.message || 'Server error'));
-                }
-            });
-        }
-
-        // Fetch products
-        function loadProducts() {
-            $.ajax({
-                url: '/api/products',
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${token}` },
-                success: function(data) {
-                    const productList = $('#productList');
-                    productList.empty();
-                    if (!data.products || data.products.length === 0) {
-                        productList.append('<p class="text-center">No products found.</p>');
-                    } else {
-                        data.products.forEach(product => {
-                            const productHtml = `
-                                <div class="card" data-id="${product._id}">
-                                    <div class="card-body">
-                                        <div class="d-flex align-items-center mb-2">
-                                            <img src="${product.image || '/images/default.png'}" alt="${product.name}" style="transition: opacity 0.3s ease;" onload="this.style.opacity='1';" style="opacity: 0;">
-                                            <div class="ms-3">
-                                                <h5>${product.name}</h5>
-                                                <p>Price: ₦${product.price.toLocaleString()}</p>
-                                                <p>Stock: ${product.stock}</p>
-                                            </div>
+                                <div class="modal-body">
+                                    <form id="editUserForm">
+                                        <input type="hidden" id="editUserId" value="${userId}">
+                                        <input type="hidden" id="editUserCsrfToken">
+                                        <div class="mb-3">
+                                            <label for="editUserName" class="form-label">Name</label>
+                                            <input type="text" class="form-control" id="editUserName" value="${name}" required>
                                         </div>
-                                        <button class="btn btn-warning btn-sm edit-product" data-id="${product._id}" 
-                                                data-name="${product.name}" data-price="${product.price}" 
-                                                data-stock="${product.stock}" data-image="${product.image || ''}" 
-                                                data-description="${product.description || ''}" 
-                                                data-brand="${product.brand || ''}">Edit</button>
-                                        <button class="btn btn-danger btn-sm ms-2 delete-product" data-id="${product._id}">Delete</button>
-                                    </div>
+                                        <div class="mb-3">
+                                            <label for="editUserEmail" class="form-label">Email</label>
+                                            <input type="email" class="form-control" id="editUserEmail" value="${email}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="editUserPhone" class="form-label">Phone</label>
+                                            <input type="tel" class="form-control" id="editUserPhone" value="${phone}">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="editUserRole" class="form-label">Role</label>
+                                            <select class="form-control" id="editUserRole" required>
+                                                <option value="user" ${role === 'user' ? 'selected' : ''}>User</option>
+                                                <option value="admin" ${role === 'admin' ? 'selected' : ''}>Admin</option>
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary w-100">Update User</button>
+                                    </form>
                                 </div>
-                            `;
-                            productList.append(productHtml);
-                        });
-                    }
-                },
-                error: function(err) {
-                    console.error('Load products error:', err);
-                    $('#productList').append('<p class="text-center">Error loading products.</p>');
-                    alert('Error loading products: ' + (err.responseJSON?.message || 'Server error'));
-                }
-            });
-        }
-
-        // Fetch users
-        function loadUsers() {
-            $.ajax({
-                url: '/api/admin/users',
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${token}` },
-                success: function(users) {
-                    const userList = $('#userList');
-                    userList.empty();
-                    if (users.length === 0) {
-                        userList.append('<p class="text-center">No users found.</p>');
-                    } else {
-                        users.forEach(user => {
-                            const userHtml = `
-                                <div class="card" data-id="${user._id}">
-                                    <div class="card-body">
-                                        <h5>${user.name}</h5>
-                                        <p>Email: ${user.email}</p>
-                                        <p>Role: ${user.role}</p>
-                                        <p>Phone: ${user.phone || 'N/A'}</p>
-                                        <button class="btn btn-warning btn-sm edit-user" data-id="${user._id}" 
-                                                data-name="${user.name}" data-email="${user.email}" 
-                                                data-role="${user.role}" data-phone="${user.phone || ''}">Edit</button>
-                                        <button class="btn btn-danger btn-sm ms-2 delete-user" data-id="${user._id}">Delete</button>
-                                    </div>
-                                </div>
-                            `;
-                            userList.append(userHtml);
-                        });
-                    }
-                },
-                error: function(err) {
-                    console.error('Load users error:', err);
-                    $('#userList').append('<p class="text-center">Error loading users.</p>');
-                    alert('Error loading users: ' + (err.responseJSON?.message || 'Server error'));
-                }
-            });
-        }
-
-        // Fetch analytics
-        function loadAnalytics() {
-            $.ajax({
-                url: '/api/admin/analytics',
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${token}` },
-                success: function(data) {
-                    $('#totalSales').text(`₦${data.totalRevenue.toLocaleString()}`);
-                    $('#totalOrders').text(data.totalOrders);
-                    $('#pendingOrders').text(data.totalOrders); // Adjust if needed
-                    const topProducts = $('#topProducts');
-                    topProducts.empty();
-                    topProducts.append('<li>Data unavailable.</li>');
-                },
-                error: function(err) {
-                    console.error('Load analytics error:', err);
-                    $('#totalSales').text('Error');
-                    $('#totalOrders').text('Error');
-                    $('#pendingOrders').text('Error');
-                    $('#topProducts').append('<li>Error loading analytics.</li>');
-                    alert('Error loading analytics: ' + (err.responseJSON?.message || 'Server error'));
-                }
-            });
-        }
-
-        // Add product
-        $('#addProductForm').submit(function(e) {
-            e.preventDefault();
-            const formData = new FormData();
-            formData.append('name', $('#productName').val());
-            formData.append('price', parseFloat($('#productPrice').val()));
-            formData.append('stock', parseInt($('#productStock').val()));
-            formData.append('description', $('#productDescription').val());
-            formData.append('brand', 'Generic');
-            const imageFile = $('#productImage')[0].files[0];
-            if (imageFile) {
-                formData.append('image', imageFile);
-            }
-            $.ajax({
-                url: '/api/products',
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'X-CSRF-Token': $('#csrfToken').val()
-                },
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    alert('Product added.');
-                    $('#addProductModal').modal('hide');
-                    $('#addProductForm')[0].reset();
-                    loadProducts();
-                },
-                error: function(err) {
-                    console.error('Add product error:', err);
-                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-                }
-            });
-        });
-
-        // Edit product
-        $(document).on('click', '.edit-product', function() {
-            $('#editProductId').val($(this).data('id'));
-            $('#editProductName').val($(this).data('name'));
-            $('#editProductPrice').val($(this).data('price'));
-            $('#editProductStock').val($(this).data('stock'));
-            $('#editProductDescription').val($(this).data('description'));
-            $('#editProductModal').modal('show');
-        });
-
-        $('#editProductForm').submit(function(e) {
-            e.preventDefault();
-            const productId = $('#editProductId').val();
-            const formData = new FormData();
-            formData.append('name', $('#editProductName').val());
-            formData.append('price', parseFloat($('#editProductPrice').val()));
-            formData.append('stock', parseInt($('#editProductStock').val()));
-            formData.append('description', $('#editProductDescription').val());
-            formData.append('brand', 'Generic');
-            const imageFile = $('#editProductImage')[0].files[0];
-            if (imageFile) {
-                formData.append('image', imageFile);
-            }
-            $.ajax({
-                url: `/api/products/${productId}`,
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'X-CSRF-Token': $('#editCsrfToken').val()
-                },
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    alert('Product updated.');
-                    $('#editProductModal').modal('hide');
-                    $('#editProductForm')[0].reset();
-                    loadProducts();
-                },
-                error: function(err) {
-                    console.error('Edit product error:', err);
-                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-                }
-            });
-        });
-
-        // Delete product
-        $(document).on('click', '.delete-product', function() {
-            if (!confirm('Are you sure you want to delete this product?')) return;
-            const productId = $(this).data('id');
-            $.ajax({
-                url: `/api/products/${productId}`,
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'X-CSRF-Token': $('#csrfToken').val()
-                },
-                success: function(response) {
-                    alert('Product deleted.');
-                    $(`[data-id="${productId}"]`).remove();
-                },
-                error: function(err) {
-                    console.error('Delete product error:', err);
-                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-                }
-            });
-        });
-
-        // Update status
-        $(document).on('change', '.status-select', function() {
-            const id = $(this).data('id');
-            const status = $(this).val();
-            const isOrder = $(this).hasClass('order-status');
-            const endpoint = isOrder ? 'orders' : 'repairs';
-            console.log(`Updating ${endpoint} status:`, { id, status });
-            $.ajax({
-                url: `/api/admin/${endpoint}/${id}`,
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'X-CSRF-Token': $('#csrfToken').val()
-                },
-                contentType: 'application/json',
-                data: JSON.stringify({ status }),
-                success: function(response) {
-                    console.log(`${endpoint} status updated:`, response);
-                    alert(`${isOrder ? 'Order' : 'Repair'} status updated.`);
-                    if (isOrder) {
-                        $(`[data-id="${id}"] .badge`).removeClass('bg-secondary bg-warning bg-info bg-success')
-                            .addClass(`bg-${status === 'Delivered' ? 'success' : status === 'Shipped' ? 'info' : status === 'Processing' ? 'warning' : 'secondary'}`)
-                            .text(status);
-                        loadAnalytics();
-                    }
-                },
-                error: function(err) {
-                    console.error(`Update ${endpoint} status error:`, err);
-                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-                }
-            });
-        });
-
-        // Delete order
-        $(document).on('click', '.delete-order', function() {
-            if (!confirm('Are you sure you want to delete this order?')) return;
-            const orderId = $(this).data('id');
-            $.ajax({
-                url: `/api/admin/orders/${orderId}`,
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'X-CSRF-Token': $('#csrfToken').val()
-                },
-                success: function(response) {
-                    alert('Order deleted.');
-                    $(`[data-id="${orderId}"]`).remove();
-                    loadAnalytics();
-                },
-                error: function(err) {
-                    console.error('Delete order error:', err);
-                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-                }
-            });
-        });
-
-        // Delete repair
-        $(document).on('click', '.delete-repair', function() {
-            if (!confirm('Are you sure you want to delete this repair?')) return;
-            const repairId = $(this).data('id');
-            $.ajax({
-                url: `/api/admin/repairs/${repairId}`,
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'X-CSRF-Token': $('#csrfToken').val()
-                },
-                success: function(response) {
-                    alert('Repair deleted.');
-                    $(`[data-id="${repairId}"]`).remove();
-                },
-                error: function(err) {
-                    console.error('Delete repair error:', err);
-                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-                }
-            });
-        });
-
-        // Edit user
-        $(document).on('click', '.edit-user', function() {
-            const userId = $(this).data('id');
-            const name = $(this).data('name');
-            const email = $(this).data('email');
-            const role = $(this).data('role');
-            const phone = $(this).data('phone');
-            const modalHtml = `
-                <div class="modal fade" id="editUserModal" tabindex="-1">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Edit User</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <form id="editUserForm">
-                                    <input type="hidden" id="editUserId" value="${userId}">
-                                    <input type="hidden" id="editUserCsrfToken">
-                                    <div class="mb-3">
-                                        <label for="editUserName" class="form-label">Name</label>
-                                        <input type="text" class="form-control" id="editUserName" value="${name}" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="editUserEmail" class="form-label">Email</label>
-                                        <input type="email" class="form-control" id="editUserEmail" value="${email}" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="editUserPhone" class="form-label">Phone</label>
-                                        <input type="tel" class="form-control" id="editUserPhone" value="${phone}">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="editUserRole" class="form-label">Role</label>
-                                        <select class="form-control" id="editUserRole" required>
-                                            <option value="user" ${role === 'user' ? 'selected' : ''}>User</option>
-                                            <option value="admin" ${role === 'admin' ? 'selected' : ''}>Admin</option>
-                                        </select>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary w-100">Update User</button>
-                                </form>
                             </div>
                         </div>
                     </div>
-                </div>
-            `;
-            $('body').append(modalHtml);
-            $('#editUserCsrfToken').val($('#csrfToken').val());
-            $('#editUserModal').modal('show');
-        });
-
-        $(document).on('submit', '#editUserForm', function(e) {
-            e.preventDefault();
-            const userId = $('#editUserId').val();
-            const userData = {
-                name: $('#editUserName').val(),
-                email: $('#editUserEmail').val(),
-                phone: $('#editUserPhone').val(),
-                role: $('#editUserRole').val()
-            };
-            $.ajax({
-                url: `/api/admin/users/${userId}`,
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'X-CSRF-Token': $('#editUserCsrfToken').val()
-                },
-                contentType: 'application/json',
-                data: JSON.stringify(userData),
-                success: function(response) {
-                    alert('User updated.');
-                    $('#editUserModal').modal('hide');
-                    $('#editUserModal').remove();
-                    loadUsers();
-                },
-                error: function(err) {
-                    console.error('Edit user error:', err);
-                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-                }
+                `;
+                $('body').append(modalHtml);
+                $('#editUserCsrfToken').val($('#csrfToken').val());
+                $('#editUserModal').modal('show');
             });
-        });
 
-        // Delete user
-        $(document).on('click', '.delete-user', function() {
-            if (!confirm('Are you sure you want to delete this user?')) return;
-            const userId = $(this).data('id');
-            $.ajax({
-                url: `/api/admin/users/${userId}`,
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'X-CSRF-Token': $('#csrfToken').val()
-                },
-                success: function(response) {
-                    alert('User deleted.');
-                    $(`[data-id="${userId}"]`).remove();
-                },
-                error: function(err) {
-                    console.error('Delete user error:', err);
-                    alert('Error: ' + (err.responseJSON?.message || 'Server error'));
-                }
+            $(document).on('submit', '#editUserForm', function(e) {
+                e.preventDefault();
+                const userId = $('#editUserId').val();
+                const userData = {
+                    name: $('#editUserName').val(),
+                    email: $('#editUserEmail').val(),
+                    phone: $('#editUserPhone').val(),
+                    role: $('#editUserRole').val()
+                };
+                $.ajax({
+                    url: `/api/admin/users/${userId}`,
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-CSRF-Token': $('#editUserCsrfToken').val()
+                    },
+                    contentType: 'application/json',
+                    data: JSON.stringify(userData),
+                    success: function(response) {
+                        alert('User updated.');
+                        $('#editUserModal').modal('hide');
+                        $('#editUserModal').remove();
+                        loadUsers();
+                    },
+                    error: function(err) {
+                        console.error('Edit user error:', err);
+                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    }
+                });
             });
-        });
 
-        // Logout
-        $('#logout').click(function(e) {
-            e.preventDefault();
-            localStorage.removeItem('token');
-            window.location.href = 'index.html';
-        });
+            // Delete user
+            $(document).on('click', '.delete-user', function() {
+                if (!confirm('Are you sure you want to delete this user?')) return;
+                const userId = $(this).data('id');
+                $.ajax({
+                    url: `/api/admin/users/${userId}`,
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-CSRF-Token': $('#csrfToken').val()
+                    },
+                    success: function(response) {
+                        alert('User deleted.');
+                        $(`[data-id="${userId}"]`).remove();
+                    },
+                    error: function(err) {
+                        console.error('Delete user error:', err);
+                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    }
+                });
+            });
 
-        // Load initial data
-        loadOrders();
-        loadRepairs();
-        loadProducts();
-        loadUsers();
-        loadAnalytics();
-    });
-</script>
+            // Logout
+            $('#logout').click(function(e) {
+                e.preventDefault();
+                localStorage.removeItem('token');
+                window.location.href = 'index.html';
+            });
+
+            // Load initial data
+            loadOrders();
+            loadRepairs();
+            loadProducts();
+            loadUsers();
+            loadAnalytics();
+        });
+    </script>
 </body>
 </html> 
