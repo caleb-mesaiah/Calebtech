@@ -79,7 +79,9 @@
 
             // Handle login form submission
             $('#loginForm').submit(function(e) {
-                e.preventDefault(); // Prevent default form submission
+                e.preventDefault();
+                const $button = $(this).find('button[type="submit"]');
+                $button.prop('disabled', true).text('Logging in...');
                 const email = $('#email').val();
                 const password = $('#password').val();
                 const csrfToken = $('#csrfToken').val();
@@ -99,10 +101,11 @@
                     error: function(err) {
                         console.error('Login error:', err);
                         $('#errorAlert').text(err.responseJSON?.message || 'Login failed. Please try again.').show();
+                        $button.prop('disabled', false).text('Login');
                     }
                 });
             });
         });
     </script>
 </body>
-</html> 
+</html>
