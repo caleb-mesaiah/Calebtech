@@ -20,40 +20,54 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
     methods: ['GET', 'POST', 'PUT', 'DELETE']
 }));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// CSRF middleware with enhanced logging
-const csrfProtection = csurf({
-    cookie: {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        key: '_csrf'
-    }
-});
+// Debug logging for requests
 app.use((req, res, next) => {
-    console.log('Request Headers:', {
-        'X-CSRF-Token': req.headers['x-csrf-token'],
-        'Cookie': req.headers.cookie
+    console.log('Request:', {
+        method: req.method,
+        url: req.url,
+        headers: {
+            'X-CSRF-Token': req.headers['x-csrf-token'],
+            'Cookie': req.headers.cookie,
+            'Authorization': req.headers.authorization ? 'Bearer <redacted>' : undefined
+        }
     });
     next();
+});
+
+// CSRF middleware
+const csrfProtection = csurf({
+    cookie: {
+        key: '_csrf',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 3600 // 1 hour
+    }
 });
 
 // CSRF error handler
 app.use((err, req, res, next) => {
     if (err.code === 'EBADCSRFTOKEN') {
-        console.error('CSRF Error:', {
+        console.error('CSRF Validation Error:', {
             message: err.message,
             tokenReceived: req.headers['x-csrf-token'],
             cookie: req.headers.cookie,
-            bodyToken: req.body._csrf
+            bodyToken: req.body._csrf,
+            url: req.url,
+            method: req.method
         });
         return res.status(403).json({ message: 'Invalid CSRF token' });
     }
-    next(err);
+    console.error('Unexpected Error:', {
+        message: err.message,
+        stack: err.stack
+    });
+    res.status(500).json({ message: 'Server error' });
 });
 
 // Log environment variables (mask sensitive values)
@@ -207,6 +221,7 @@ const adminMiddleware = (req, res, next) => {
 app.get('/api/csrf-token', csrfProtection, (req, res) => {
     const token = req.csrfToken();
     console.log('CSRF token generated:', token);
+    res.cookie('_csrf', req.csrfToken(), { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 });
     res.json({ csrfToken: token });
 });
 
