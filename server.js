@@ -19,7 +19,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-const csrfProtection = csurf({ cookie: { httpOnly: true, secure: process.env.NODE_ENV === 'production' } });
+const csrfProtection = csurf({ cookie: { httpOnly: true, secure: true } });
+app.use((req, res, next) => {
+    console.log('Request CSRF token:', req.headers['x-csrf-token']);
+    next();
+});
 
 // Log environment variables (mask sensitive values)
 console.log('Environment variables:', {
@@ -56,11 +60,9 @@ const storage = new CloudinaryStorage({
 const upload = multer({ storage });
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection error:', err));
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log('MongoDB connected to:', mongoose.connection.db.databaseName))
+    .catch(err => console.error('MongoDB connection error:', err));
 
 // Models
 const UserSchema = new mongoose.Schema({
@@ -202,7 +204,7 @@ app.post('/api/auth/login', csrfProtection, async (req, res) => {
     try {
         const { email, password } = req.body;
         console.log('Login attempt:', email);
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
         if (!user) {
             console.log('Login failed: User not found', email);
             return res.status(400).json({ message: 'Invalid credentials' });
@@ -235,7 +237,9 @@ app.post('/api/auth/forgot-password', csrfProtection, async (req, res) => {
     try {
         const { email } = req.body;
         console.log('Forgot password request:', email);
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        console.log('Query result:', user);
+        console.log('All users:', await mongoose.connection.db.collection('users').find({}).toArray());
         if (!user) {
             console.log('Forgot password: User not found', email);
             return res.status(404).json({ message: 'User not found' });
@@ -311,9 +315,19 @@ app.get('/api/products/:id', async (req, res) => {
 
 app.post('/api/products', authMiddleware, adminMiddleware, csrfProtection, upload.single('image'), async (req, res) => {
     try {
+        console.log('CSRF token validated for product addition');
         const { name, description, price, brand, stock } = req.body;
-        console.log('Add product attempt:', name);
+        console.log('Add product attempt:', { name, price, stock, description, brand, hasImage: !!req.file });
+        if (!name || !price || !stock) {
+            console.log('Validation failed: Missing required fields', { name, price, stock });
+            return res.status(400).json({ message: 'Name, price, and stock are required' });
+        }
+        if (isNaN(parseFloat(price)) || isNaN(parseInt(stock))) {
+            console.log('Validation failed: Invalid price or stock', { price, stock });
+            return res.status(400).json({ message: 'Price and stock must be valid numbers' });
+        }
         const image = req.file ? req.file.path : null;
+        console.log('Image URL:', image);
         const newProduct = new Product({
             name,
             description,
@@ -326,15 +340,28 @@ app.post('/api/products', authMiddleware, adminMiddleware, csrfProtection, uploa
         res.status(201).json(newProduct);
         console.log('Product added:', name);
     } catch (error) {
-        console.error('Add product error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Add product error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
 app.put('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection, upload.single('image'), async (req, res) => {
     try {
+        console.log('CSRF token validated for product update');
         const { name, description, price, brand, stock } = req.body;
-        console.log('Update product attempt:', req.params.id);
+        console.log('Update product attempt:', { id: req.params.id, name, price, stock, description, brand, hasImage: !!req.file });
+        if (!name || !price || !stock) {
+            console.log('Validation failed: Missing required fields', { name, price, stock });
+            return res.status(400).json({ message: 'Name, price, and stock are required' });
+        }
+        if (isNaN(parseFloat(price)) || isNaN(parseInt(stock))) {
+            console.log('Validation failed: Invalid price or stock', { price, stock });
+            return res.status(400).json({ message: 'Price and stock must be valid numbers' });
+        }
         const updateData = {
             name,
             description,
@@ -354,13 +381,18 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection, up
         res.json(product);
         console.log('Product updated:', name);
     } catch (error) {
-        console.error('Update product error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Update product error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
 app.delete('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for product deletion');
         console.log('Delete product attempt:', req.params.id);
         const product = await Product.findByIdAndDelete(req.params.id);
         if (!product) {
@@ -370,13 +402,18 @@ app.delete('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection,
         res.json({ message: 'Product deleted' });
         console.log('Product deleted:', product.name);
     } catch (error) {
-        console.error('Delete product error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Delete product error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
 app.post('/api/orders', authMiddleware, csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for order creation');
         const { items, total, shippingAddress } = req.body;
         console.log('Create order attempt:', req.user.email);
         const orderId = `ORD${Date.now()}`;
@@ -399,8 +436,12 @@ app.post('/api/orders', authMiddleware, csrfProtection, async (req, res) => {
         res.status(201).json(order);
         console.log('Order created:', orderId);
     } catch (error) {
-        console.error('Create order error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Create order error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
@@ -418,6 +459,7 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
 
 app.post('/api/repairs', csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for repair creation');
         const { userId, name, email, phone, deviceType, deviceModel, issue, contactMethod, preferredDate, image } = req.body;
         console.log('Create repair request:', email);
         const repairId = `REP${Date.now()}`;
@@ -445,8 +487,12 @@ app.post('/api/repairs', csrfProtection, async (req, res) => {
         res.status(201).json(repair);
         console.log('Repair request created:', repairId);
     } catch (error) {
-        console.error('Create repair error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Create repair error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
@@ -464,6 +510,7 @@ app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) =
 
 app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for order update');
         const { status } = req.body;
         console.log('Update order:', req.params.id);
         const order = await Order.findByIdAndUpdate(
@@ -485,13 +532,18 @@ app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtection
         res.json(order);
         console.log('Order updated:', order.orderId);
     } catch (error) {
-        console.error('Update order error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Update order error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
 app.delete('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for order deletion');
         console.log('Delete order:', req.params.id);
         const order = await Order.findByIdAndDelete(req.params.id);
         if (!order) {
@@ -501,8 +553,12 @@ app.delete('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtect
         res.json({ message: 'Order deleted' });
         console.log('Order deleted:', order.orderId);
     } catch (error) {
-        console.error('Delete order error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Delete order error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
@@ -520,6 +576,7 @@ app.get('/api/admin/repairs', authMiddleware, adminMiddleware, async (req, res) 
 
 app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for repair update');
         const { status } = req.body;
         console.log('Update repair:', req.params.id);
         const repair = await Repair.findByIdAndUpdate(
@@ -541,13 +598,18 @@ app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtectio
         res.json(repair);
         console.log('Repair updated:', repair.repairId);
     } catch (error) {
-        console.error('Update repair error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Update repair error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
 app.delete('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for repair deletion');
         console.log('Delete repair:', req.params.id);
         const repair = await Repair.findByIdAndDelete(req.params.id);
         if (!repair) {
@@ -557,8 +619,12 @@ app.delete('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtec
         res.json({ message: 'Repair deleted' });
         console.log('Repair deleted:', repair.repairId);
     } catch (error) {
-        console.error('Delete repair error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Delete repair error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
@@ -576,6 +642,7 @@ app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) =>
 
 app.put('/api/admin/users/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for user update');
         const { name, email, phone, role } = req.body;
         console.log('Update user:', req.params.id);
         const user = await User.findByIdAndUpdate(
@@ -590,13 +657,18 @@ app.put('/api/admin/users/:id', authMiddleware, adminMiddleware, csrfProtection,
         res.json(user);
         console.log('User updated:', user.email);
     } catch (error) {
-        console.error('Update user error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Update user error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
 app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
+        console.log('CSRF token validated for user deletion');
         console.log('Delete user:', req.params.id);
         const user = await User.findByIdAndDelete(req.params.id);
         if (!user) {
@@ -606,8 +678,12 @@ app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, csrfProtecti
         res.json({ message: 'User deleted' });
         console.log('User deleted:', user.email);
     } catch (error) {
-        console.error('Delete user error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Delete user error:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
@@ -636,4 +712,4 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`)); 
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
