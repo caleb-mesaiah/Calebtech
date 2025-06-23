@@ -52,10 +52,11 @@ app.use((req, res, next) => {
 });
 
 // CSRF Middleware
+// CSRF Middleware
 const csrfProtection = csrf({
     cookie: {
         key: '_csrf',
-        secure: true,
+        secure: process.env.NODE_ENV === 'production', // false for local
         sameSite: 'strict',
         maxAge: 3600
     },
@@ -73,7 +74,6 @@ const csrfProtection = csrf({
         return token;
     }
 });
-
 // Apply CSRF protection selectively
 app.use((req, res, next) => {
     if (req.method === 'GET' || req.path === '/api/auth/login' || req.path === '/api/csrf-token') {
