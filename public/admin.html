@@ -992,23 +992,125 @@
                         });
                         $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
                     }
+<script>
+    $(document).ready(function() {
+        // Loader
+        $('body').addClass('loader-active');
+        setTimeout(() => {
+            $('#loader').addClass('hidden');
+            $('body').removeClass('loader-active');
+        }, 2000);
+
+        // Authentication check
+        const token = localStorage.getItem('token');
+        if (!token) {
+            $('#errorAlert').text('Please login as an admin to access this page.').show();
+            setTimeout(() => window.location.href = 'login.html', 1000);
+            return;
+        }
+
+        let csrfToken = null;
+
+        // Fetch CSRF token with retry
+        async function fetchCsrfToken(retries = 3, delay = 1000) {
+            try {
+                const response = await $.ajax({
+                    url: '/api/csrf-token',
+                    method: 'GET',
+                    xhrFields: { withCredentials: true }
                 });
-            });
+                csrfToken = response.csrfToken;
+                console.log('CSRF token fetched:', csrfToken);
+                $('#csrfToken, #editCsrfToken, #editUserCsrfToken').val(csrfToken);
+                $('#addProductForm button[type="submit"]').prop('disabled', false); // Enable form
+            } catch (xhr) {
+                console.error('CSRF token fetch error:', {
+                    status: xhr.status,
+                    statusText: xhr.statusText,
+                    responseText: xhr.responseText || 'No response',
+                    retriesLeft: retries
+                });
+                if (retries > 0) {
+                    setTimeout(() => fetchCsrfToken(retries - 1, delay * 2), delay);
+                } else {
+                    $('#errorAlert').text('Failed to load CSRF token. Please refresh.').show();
+                    $('#addProductForm button[type="submit"]').prop('disabled', true);
+                }
+            }
+        }
 
-            // Logout
-            $('#logout').click(function(e) {
-                e.preventDefault();
+        // Disable form until CSRF token is fetched
+        $('#addProductForm button[type="submit"]').prop('disabled', true);
+        fetchCsrfToken();
+
+        // Verify admin role
+        $.ajax({
+            url: '/api/auth/profile',
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` },
+            success: function(user) {
+                if (user.role !== 'admin') {
+                    $('#errorAlert').text('Access denied. Admin privileges required.').show();
+                    localStorage.removeItem('token');
+                    setTimeout(() => window.location.href = 'index.html', 1000);
+                    return;
+                }
+                console.log('Admin verified:', user.email);
+            },
+            error: function(xhr) {
+                console.error('Profile error:', xhr.responseJSON?.message || 'Server error');
+                $('#errorAlert').text('Session expired. Please login again.').show();
                 localStorage.removeItem('token');
-                window.location.href = 'index.html';
-            });
-
-            // Load initial data
-            loadOrders();
-            loadRepairs();
-            loadProducts();
-            loadUsers();
-            loadAnalytics();
+                setTimeout(() => window.location.href = 'login.html', 1000);
+            }
         });
+
+        // Add product
+        $('#addProductForm').submit(async function(e) {
+            e.preventDefault();
+            const $button = $(this).find('button[type="submit"]');
+            $button.prop('disabled', true).text('Adding Product...');
+            if (!csrfToken) {
+                console.error('No CSRF token available');
+                $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                $button.prop('disabled', false).text('Add Product');
+                return;
+            }
+            const formData = new FormData(this);
+            console.log('FormData contents:', [...formData.entries()]);
+            try {
+                const response = await $.ajax({
+                    url: '/api/products',
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-CSRF-Token': csrfToken
+                    },
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    xhrFields: { withCredentials: true }
+                });
+                console.log('Product added successfully:', response);
+                alert('Product added.');
+                $('#addProductModal').modal('hide');
+                $('#addProductForm')[0].reset();
+                $button.prop('disabled', false).text('Add Product');
+                await fetchCsrfToken(); // Refresh token
+                loadProducts();
+            } catch (xhr) {
+                console.error('Add product error:', {
+                    status: xhr.status,
+                    statusText: xhr.statusText,
+                    responseText: xhr.responseText || 'No response',
+                    error: xhr.responseJSON?.message
+                });
+                $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
+                $button.prop('disabled', false).text('Add Product');
+            }
+        });
+
+        // ... (Other functions: loadOrders, loadRepairs, loadProducts, loadUsers, loadAnalytics, edit/delete handlers unchanged)
     </script>
 </body>
 </html>
