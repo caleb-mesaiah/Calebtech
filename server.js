@@ -1,15 +1,15 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
-const cookieParser = require('cookie-parser');
-const csrf = require('csurf');
 const cors = require('cors');
-const path = require('path');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const nodemailer = require('nodemailer');
+const csrf = require('csurf');
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const cloudinary = require('cloudinary').v2;
+const { cloudinary } = require('cloudinary').v2;
+const path = require('path');
 
 const app = express();
 
@@ -24,30 +24,34 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-// CSP Header
-app.use((req, res, next) => {
-    res.setHeader("Content-Security-Policy",
-        "default-src 'self'; " +
-        "script-src 'self' https://code.jquery.com https://cdn.jsdelivr.net 'unsafe-eval'; " +
-        "style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
-        "font-src 'self' https://fonts.gstatic.com; " +
-        "img-src 'self' data: https://res.cloudinary.com; " +
-        "connect-src 'self' https://calebtech.onrender.com");
-    next();
+
+// Cloudinary configuration
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Request Logging
-app.use((req, res, next) => {
-    console.log('Request:', {
-        method: req.method,
-        url: req.url,
-        headers: {
-            'X-CSRF-Token': req.headers['x-csrf-token'],
-            Cookie: req.headers.cookie,
-            Authorization: req.headers.authorization ? 'Bearer <redacted>' : undefined
+// Multer configuration for file uploads
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'calebtech_products',
+        allowed_formats: ['jpg', 'png', 'jpeg']
+    }
+});
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+    fileFilter: (req, file, cb) => {
+        const filetypes = /jpeg|jpg|png/;
+        const mimetype = filetypes.test(file.mimetype);
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        if (mimetype && extname) {
+            return cb(null, true);
         }
-    });
-    next();
+        cb(new Error('Error: Images only (jpg, png, jpeg)!'));
+    }
 });
 
 // CSRF Middleware
@@ -72,6 +76,7 @@ const csrfProtection = csrf({
         return token;
     }
 });
+
 // Apply CSRF protection selectively
 app.use((req, res, next) => {
     if (req.method === 'GET' || req.path === '/api/auth/login' || req.path === '/api/csrf-token') {
@@ -80,58 +85,23 @@ app.use((req, res, next) => {
     csrfProtection(req, res, next);
 });
 
-// Log Environment Variables
-console.log('Environment variables:', {
-    MONGODB_URI: process.env.MONGODB_URI ? 'Set' : 'Missing',
-    JWT_SECRET: process.env.JWT_SECRET ? 'Set' : 'Missing',
-    EMAIL_USER: process.env.EMAIL_USER ? 'Set' : 'Missing',
-    EMAIL_PASS: process.env.EMAIL_PASS ? 'Set' : 'Missing',
-    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME ? 'Set' : 'Missing',
-    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? 'Set' : 'Missing',
-    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? 'Set' : 'Missing'
+// MongoDB connection
+mongoose.connect(process.env.MONGODB_URI, { 
+    useNewUrlParser: true, 
+    useUnifiedTopology: true 
+}).then(() => {
+    console.log('Connected to MongoDB');
+}).catch(err => {
+    console.error('MongoDB connection error:', err);
 });
 
-// Configure Cloudinary
-try {
-    cloudinary.config({
-        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-        api_key: process.env.CLOUDINARY_API_KEY,
-        api_secret: process.env.CLOUDINARY_API_SECRET
-    });
-    console.log('Cloudinary configured successfully');
-} catch (error) {
-    console.error('Cloudinary config error:', error);
-}
-
-// Configure Multer with Cloudinary Storage
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'calebtech/products',
-        allowed_formats: ['jpg', 'png', 'webp'],
-        transformation: [{ width: 500, height: 500, crop: 'limit' }]
-    }
-});
-const upload = multer({ storage });
-
-// MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => console.log('MongoDB connected', { database: mongoose.connection.db.databaseName }))
-    .catch(err => console.error('MongoDB connection error:', err));
-
-// Models
+// Schemas
 const UserSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, default: 'user' },
     phone: String,
-    address: String,
-    likedProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
-    resetPasswordToken: String,
-    resetPasswordExpires: Date,
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+    role: { type: String, enum: ['user', 'admin'], default: 'user' }
 });
 
 const ProductSchema = new mongoose.Schema({
@@ -141,39 +111,36 @@ const ProductSchema = new mongoose.Schema({
     brand: String,
     stock: { type: Number, default: 0 },
     image: String,
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    deleted: { type: Boolean, default: false } // Soft deletion
 });
 
 const OrderSchema = new mongoose.Schema({
-    orderId: { type: String, required: true, unique: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    orderId: { type: String, unique: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     items: [{
-        productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
         name: String,
         quantity: Number,
         price: Number,
         image: String
     }],
-    total: { type: Number, required: true },
+    total: Number,
+    status: { type: String, enum: ['Pending', 'Processing', 'Shipped', 'Delivered'], default: 'Pending' },
     shippingAddress: String,
-    status: { type: String, default: 'Pending' },
     createdAt: { type: Date, default: Date.now }
 });
 
 const RepairSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    repairId: { type: String, required: true, unique: true },
+    repairId: { type: String, unique: true },
     name: String,
     email: String,
-    phone: String,
     deviceType: String,
     deviceModel: String,
     issue: String,
     contactMethod: String,
     preferredDate: Date,
-    image: String,
-    status: { type: String, default: 'Pending' },
-    createdAt: { type: Date, default: Date.now }
+    status: { type: String, enum: ['Pending', 'In Progress', 'Completed'], default: 'Pending' },
+    image: String
 });
 
 const User = mongoose.model('User', UserSchema);
@@ -181,53 +148,53 @@ const Product = mongoose.model('Product', ProductSchema);
 const Order = mongoose.model('Order', OrderSchema);
 const Repair = mongoose.model('Repair', RepairSchema);
 
-// Nodemailer Setup
-let transporter;
-try {
-    transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        }
-    });
-    console.log('Nodemailer configured successfully');
-} catch (error) {
-    console.error('Nodemailer config error:', error);
-}
+// Nodemailer setup
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
 
-// Middleware
+// Authentication middleware
 const authMiddleware = async (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
         console.log('Auth middleware: No token provided');
         return res.status(401).json({ message: 'No token provided' });
     }
+    const token = authHeader.split(' ')[1];
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        console.log('Auth middleware: Token decoded', { userId: decoded.id });
-        const user = await User.findById(decoded.id).select('-password');
-        if (!user) {
-            console.log('Auth middleware: User not found', { userId: decoded.id });
-            return res.status(401).json({ message: 'User not found' });
-        }
-        req.user = user;
+        req.user = decoded;
+        console.log('Auth middleware: Token verified', { userId: decoded.id });
         next();
     } catch (error) {
-        console.error('JWT verification error:', error);
+        console.error('Auth middleware error:', { message: error.message });
         res.status(401).json({ message: 'Invalid token' });
     }
 };
 
-const adminMiddleware = (req, res, next) => {
-    console.log('Admin middleware: Checking role', { role: req.user.role });
-    if (req.user.role !== 'admin') {
-        return res.status(403).json({ message: 'Admin access required' });
+// Admin middleware
+const adminMiddleware = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user || user.role !== 'admin') {
+            console.log('Admin middleware: Access denied', { userId: req.user.id });
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+        console.log('Admin middleware: Access granted', { userId: req.user.id });
+        next();
+    } catch (error) {
+        console.error('Admin middleware error:', { message: error.message });
+        res.status(500).json({ message: 'Server error' });
     }
-    next();
 };
 
 // Routes
+
+// CSRF Token
 app.get('/api/csrf-token', (req, res, next) => {
     try {
         const token = req.csrfToken();
@@ -242,147 +209,79 @@ app.get('/api/csrf-token', (req, res, next) => {
     }
 });
 
-app.post('/api/auth/register', csrfProtection, async (req, res) => {
+// User registration
+app.post('/api/auth/register', async (req, res) => {
     try {
-        console.log('CSRF token validated for register', {
-            token: req.headers['x-csrf-token'] || req.body._csrf,
-            cookie: req.cookies._csrf
-        });
+        console.log('Register attempt', { email: req.body.email });
         const { name, email, password, phone } = req.body;
-        console.log('Register attempt', { email });
+        if (!name || !email || !password) {
+            console.log('Register: Missing fields', { body: req.body });
+            return res.status(400).json({ message: 'All fields are required' });
+        }
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            console.log('User already exists', { email });
+            console.log('Register: User already exists', { email });
             return res.status(400).json({ message: 'User already exists' });
         }
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = new User({ name, email, password: hashedPassword, phone });
         await user.save();
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
-        res.status(201).json({ token, user: { name, email, role: user.role, phone } });
         console.log('User registered', { email });
+        res.status(201).json({ message: 'User registered successfully' });
     } catch (error) {
-        console.error('Register error:', error);
+        console.error('Register error:', { message: error.message });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
+// User login
 app.post('/api/auth/login', async (req, res) => {
-    console.log('Login request body:', req.body);
     try {
+        console.log('Login attempt', { email: req.body.email });
         const { email, password } = req.body;
-        console.log('Login attempt', { email });
-        const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        const user = await User.findOne({ email });
         if (!user) {
-            console.log('Login failed: User not found', { email });
+            console.log('Login: User not found', { email });
             return res.status(400).json({ message: 'Invalid credentials' });
         }
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            console.log('Login failed: Password mismatch', { email });
+            console.log('Login: Invalid password', { email });
             return res.status(400).json({ message: 'Invalid credentials' });
         }
-        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
-        res.json({ token, user: { name: user.name, email, role: user.role, phone: user.phone } });
-        console.log('User logged in', { email });
+        const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        console.log('User logged in', { email, token });
+        res.json({ token });
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('Login error:', { message: error.message });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
+// User profile
 app.get('/api/auth/profile', authMiddleware, async (req, res) => {
     try {
-        console.log('Profile request', { email: req.user.email });
-        res.json(req.user);
-    } catch (error) {
-        console.error('Profile error:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-app.post('/api/auth/forgot-password', csrfProtection, async (req, res) => {
-    try {
-        console.log('CSRF token validated for forgot-password', {
-            token: req.headers['x-csrf-token'] || req.body._csrf,
-            cookie: req.cookies._csrf
-        });
-        const { email } = req.body;
-        console.log('Forgot password request', { email });
-        const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        const user = await User.findById(req.user.id).select('-password');
         if (!user) {
-            console.log('Forgot password: User not found', { email });
+            console.log('Profile: User not found', { userId: req.user.id });
             return res.status(404).json({ message: 'User not found' });
         }
-        const token = Math.random().toString(36).substring(2);
-        user.resetPasswordToken = token;
-        user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
-        await user.save();
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: 'Password Reset',
-            text: `Click here to reset your password: https://calebtech.onrender.com/reset-password.html?token=${token}`
-        };
-        await transporter.sendMail(mailOptions);
-        res.json({ message: 'Password reset email sent' });
-        console.log('Email sent', { email });
-    } catch (err) {
-        console.error('Forgot password error:', err);
+        console.log('Profile fetched', { email: user.email });
+        res.json(user);
+    } catch (error) {
+        console.error('Profile error:', { message: error.message });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
-app.post('/api/auth/reset-password', csrfProtection, async (req, res) => {
-    try {
-        console.log('CSRF token validated for reset-password', {
-            token: req.headers['x-csrf-token'] || req.body._csrf,
-            cookie: req.cookies._csrf
-        });
-        const { token, newPassword } = req.body;
-        console.log('Reset password attempt', { token });
-        const user = await User.findOne({
-            resetPasswordToken: token,
-            resetPasswordExpires: { $gt: Date.now() }
-        });
-        if (!user) {
-            console.log('Reset password: Invalid/expired token');
-            return res.status(400).json({ message: 'Invalid/expired token' });
-        }
-        user.password = await bcrypt.hash(newPassword, 10);
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpires = undefined;
-        await user.save();
-        res.json({ message: 'Password reset successful' });
-        console.log('Password reset', { email: user.email });
-    } catch (err) {
-        console.error('Reset password error:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
+// Products
 app.get('/api/products', async (req, res) => {
     try {
-        const products = await Product.find();
+        const products = await Product.find({ deleted: { $ne: true } });
         res.json({ products });
         console.log('Products fetched', { count: products.length });
     } catch (error) {
-        console.error('Get products error:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-app.get('/api/products/:id', async (req, res) => {
-    try {
-        const product = await Product.findById(req.params.id);
-        if (!product) {
-            console.log('Product not found', { id: req.params.id });
-            return res.status(404).json({ message: 'Product not found' });
-        }
-        res.json(product);
-        console.log('Product fetched', { name: product.name });
-    } catch (error) {
-        console.error('Get product error:', error);
+        console.error('Get products error:', { message: error.message });
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -393,30 +292,25 @@ app.post('/api/products', authMiddleware, adminMiddleware, upload.single('image'
             token: req.headers['x-csrf-token'] || req.body._csrf,
             cookie: req.cookies._csrf
         });
-        console.log('Add product attempt', { body: req.body, file: req.file });
-        const { name, description, price, brand, stock } = req.body;
+        console.log('Add product attempt', { body: req.body });
+        const { name, description, price, stock, brand } = req.body;
         if (!name || !price || !stock) {
-            console.log('Validation failed: Missing fields', { name, price, stock });
-            return res.status(400).json({ message: 'Name, price, stock required' });
+            console.log('Add product: Missing fields', { body: req.body });
+            return res.status(400).json({ message: 'Name, price, and stock are required' });
         }
-        if (isNaN(parseFloat(price)) || isNaN(parseInt(stock))) {
-            console.log('Validation failed: Invalid price/stock', { price, stock });
-            return res.status(400).json({ message: 'Price/stock must be numbers' });
-        }
-        const image = req.file ? req.file.path : null;
-        const newProduct = new Product({
+        const product = new Product({
             name,
             description,
             price: parseFloat(price),
-            brand,
             stock: parseInt(stock),
-            image
+            brand,
+            image: req.file ? req.file.path : null
         });
-        await newProduct.save();
-        res.status(201).json(newProduct);
+        await product.save();
         console.log('Product added', { name });
-    } catch (err) {
-        console.error('Add product error:', err);
+        res.status(201).json(product);
+    } catch (error) {
+        console.error('Add product error:', { message: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -427,36 +321,27 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, upload.single('ima
             token: req.headers['x-csrf-token'] || req.body._csrf,
             cookie: req.cookies._csrf
         });
-        const { name, description, price, brand, stock } = req.body;
-        console.log('Update product attempt', { id: req.params.id, name, price, stock, description, brand, hasImage: !!req.file });
-        if (!name || !price || !stock) {
-            console.log('Validation failed: Missing required fields', { name, price, stock });
-            return res.status(400).json({ message: 'Name, price, and stock are required' });
-        }
-        if (isNaN(parseFloat(price)) || isNaN(parseInt(stock))) {
-            console.log('Validation failed: Invalid price or stock', { price, stock });
-            return res.status(400).json({ message: 'Price and stock must be valid numbers' });
-        }
+        console.log('Update product attempt', { id: req.params.id, body: req.body });
+        const { name, description, price, stock, brand } = req.body;
         const updateData = {
             name,
             description,
             price: parseFloat(price),
-            brand,
-            stock: parseInt(stock)
+            stock: parseInt(stock),
+            brand
         };
         if (req.file) {
             updateData.image = req.file.path;
-            console.log('Product image updated', { path: req.file.path });
         }
         const product = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true });
         if (!product) {
             console.log('Product not found', { id: req.params.id });
             return res.status(404).json({ message: 'Product not found' });
         }
-        res.json(product);
         console.log('Product updated', { name });
+        res.json(product);
     } catch (error) {
-        console.error('Update product error:', { error: error.message, stack: error.stack });
+        console.error('Update product error:', { message: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -467,111 +352,68 @@ app.delete('/api/products/:id', authMiddleware, adminMiddleware, async (req, res
             token: req.headers['x-csrf-token'] || req.body._csrf,
             cookie: req.cookies._csrf
         });
-        console.log('Delete product attempt', { id: req.params.id });
-        const product = await Product.findByIdAndDelete(req.params.id);
+        console.log('Soft delete product attempt', { id: req.params.id });
+        const product = await Product.findByIdAndUpdate(req.params.id, { deleted: true }, { new: true });
         if (!product) {
             console.log('Product not found', { id: req.params.id });
             return res.status(404).json({ message: 'Product not found' });
         }
-        res.json({ message: 'Product deleted' });
-        console.log('Product deleted', { name: product.name });
+        res.json({ message: 'Product flagged for deletion' });
+        console.log('Product flagged for deletion', { name: product.name });
     } catch (error) {
-        console.error('Delete product error:', { error: error.message, stack: error.stack });
+        console.error('Soft delete product error:', { message: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
+// Orders
 app.post('/api/orders', authMiddleware, async (req, res) => {
     try {
         console.log('CSRF token validated for order creation', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
             cookie: req.cookies._csrf
         });
+        console.log('Create order attempt', { userId: req.user.id });
         const { items, total, shippingAddress } = req.body;
-        console.log('Create order attempt', { email: req.user.email });
-        const orderId = `ORD${Date.now()}`;
+        if (!items || !total || !shippingAddress) {
+            console.log('Create order: Missing fields', { body: req.body });
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+        const orderCount = await Order.countDocuments();
         const order = new Order({
-            orderId,
-            userId: req.user._id,
+            orderId: `ORD${1000 + orderCount}`,
+            userId: req.user.id,
             items,
             total: parseFloat(total),
             shippingAddress
         });
         await order.save();
-        const user = await User.findById(req.user._id);
+        console.log('Order created', { orderId: order.orderId });
+
+        // Send confirmation email
         const mailOptions = {
             from: process.env.EMAIL_USER,
-            to: user.email,
-            subject: 'Order Confirmation',
-            text: `Your order #${orderId} has been placed successfully. Total: ₦${total}`
+            to: req.body.email,
+            subject: 'Order Confirmation - CalebTech',
+            text: `Your order ${order.orderId} has been placed successfully! Total: ₦${total.toLocaleString()}`
         };
         await transporter.sendMail(mailOptions);
+        console.log('Order confirmation email sent', { email: req.body.email });
+
         res.status(201).json(order);
-        console.log('Order created', { orderId });
     } catch (error) {
-        console.error('Create order error:', { error: error.message, stack: error.stack });
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-app.get('/api/orders', authMiddleware, async (req, res) => {
-    try {
-        console.log('Get orders', { email: req.user.email });
-        const orders = await Order.find({ userId: req.user._id }).populate('userId', 'name email');
-        res.json(orders);
-        console.log('Orders fetched', { count: orders.length });
-    } catch (error) {
-        console.error('Get orders error:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-app.post('/api/repairs', async (req, res) => {
-    try {
-        console.log('CSRF token validated for repair creation', {
-            token: req.headers['x-csrf-token'] || req.body._csrf,
-            cookie: req.cookies._csrf
-        });
-        const { userId, name, email, phone, deviceType, deviceModel, issue, contactMethod, preferredDate, image } = req.body;
-        console.log('Create repair request', { email });
-        const repairId = `REP${Date.now()}`;
-        const repair = new Repair({
-            userId,
-            repairId,
-            name,
-            email,
-            phone,
-            deviceType,
-            deviceModel,
-            issue,
-            contactMethod,
-            preferredDate,
-            image
-        });
-        await repair.save();
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: 'Repair Request Confirmation',
-            text: `Your repair request #${repairId} has been received. We'll contact you soon.`
-        };
-        await transporter.sendMail(mailOptions);
-        res.status(201).json(repair);
-        console.log('Repair request created', { repairId });
-    } catch (error) {
-        console.error('Create repair error:', { error: error.message, stack: error.stack });
+        console.error('Create order error:', { message: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        console.log('Get admin orders', { email: req.user.email });
         const orders = await Order.find().populate('userId', 'name email');
+        console.log('Orders fetched', { count: orders.length });
         res.json(orders);
-        console.log('Admin orders fetched', { count: orders.length });
     } catch (error) {
-        console.error('Get admin orders error:', error);
+        console.error('Get orders error:', { message: error.message });
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -582,28 +424,17 @@ app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req, re
             token: req.headers['x-csrf-token'] || req.body._csrf,
             cookie: req.cookies._csrf
         });
+        console.log('Update order attempt', { id: req.params.id, status: req.body.status });
         const { status } = req.body;
-        console.log('Update order', { id: req.params.id });
-        const order = await Order.findByIdAndUpdate(
-            req.params.id,
-            { status },
-            { new: true }
-        ).populate('userId', 'email');
+        const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
         if (!order) {
             console.log('Order not found', { id: req.params.id });
             return res.status(404).json({ message: 'Order not found' });
         }
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: order.userId.email,
-            subject: 'Order Status Update',
-            text: `Your order #${order.orderId} is now ${status}.`
-        };
-        await transporter.sendMail(mailOptions);
+        console.log('Order updated', { orderId: order.orderId, status });
         res.json(order);
-        console.log('Order updated', { orderId: order.orderId });
     } catch (error) {
-        console.error('Update order error:', { error: error.message, stack: error.stack });
+        console.error('Update order error:', { message: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -614,28 +445,72 @@ app.delete('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req,
             token: req.headers['x-csrf-token'] || req.body._csrf,
             cookie: req.cookies._csrf
         });
-        console.log('Delete order', { id: req.params.id });
+        console.log('Delete order attempt', { id: req.params.id });
         const order = await Order.findByIdAndDelete(req.params.id);
         if (!order) {
             console.log('Order not found', { id: req.params.id });
             return res.status(404).json({ message: 'Order not found' });
         }
-        res.json({ message: 'Order deleted' });
         console.log('Order deleted', { orderId: order.orderId });
+        res.json({ message: 'Order deleted' });
     } catch (error) {
-        console.error('Delete order error:', { error: error.message, stack: error.stack });
+        console.error('Delete order error:', { message: error.message, stack: error.stack });
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Repairs
+app.post('/api/repairs', upload.single('image'), async (req, res) => {
+    try {
+        console.log('CSRF token validated for repair creation', {
+            token: req.headers['x-csrf-token'] || req.body._csrf,
+            cookie: req.cookies._csrf
+        });
+        console.log('Create repair attempt', { body: req.body });
+        const { name, email, deviceType, deviceModel, issue, contactMethod, preferredDate } = req.body;
+        if (!name || !email || !deviceType || !issue || !contactMethod || !preferredDate) {
+            console.log('Create repair: Missing fields', { body: req.body });
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+        const repairCount = await Repair.countDocuments();
+        const repair = new Repair({
+            repairId: `REP${1000 + repairCount}`,
+            name,
+            email,
+            deviceType,
+            deviceModel,
+            issue,
+            contactMethod,
+            preferredDate,
+            image: req.file ? req.file.path : null
+        });
+        await repair.save();
+        console.log('Repair created', { repairId: repair.repairId });
+
+        // Send confirmation email
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'Repair Request Confirmation - CalebTech',
+            text: `Your repair request ${repair.repairId} has been received!`
+        };
+        await transporter.sendMail(mailOptions);
+        console.log('Repair confirmation email sent', { email });
+
+        res.status(201).json(repair);
+    } catch (error) {
+        console.error('Create repair error:', { message: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.get('/api/admin/repairs', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        console.log('Get admin repairs', { email: req.user.email });
-        const repairs = await Repair.find().populate('userId', 'email');
+        const repairs = await Repair.find();
+        console.log('Repairs fetched', { count: repairs.length });
         res.json(repairs);
-        console.log('Admin repairs fetched', { count: repairs.length });
     } catch (error) {
-        console.error('Get repairs error:', error);
+        console.error('Get repairs error:', { message: error.message });
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -646,28 +521,17 @@ app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req, r
             token: req.headers['x-csrf-token'] || req.body._csrf,
             cookie: req.cookies._csrf
         });
+        console.log('Update repair attempt', { id: req.params.id, status: req.body.status });
         const { status } = req.body;
-        console.log('Update repair', { id: req.params.id });
-        const repair = await Repair.findByIdAndUpdate(
-            req.params.id,
-            { status },
-            { new: true }
-        ).populate('userId', 'email');
+        const repair = await Repair.findByIdAndUpdate(req.params.id, { status }, { new: true });
         if (!repair) {
             console.log('Repair not found', { id: req.params.id });
             return res.status(404).json({ message: 'Repair not found' });
         }
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: repair.email,
-            subject: 'Repair Status Update',
-            text: `Your repair request #${repair.repairId} is now ${status}.`
-        };
-        await transporter.sendMail(mailOptions);
+        console.log('Repair updated', { repairId: repair.repairId, status });
         res.json(repair);
-        console.log('Repair updated', { repairId: repair.repairId });
     } catch (error) {
-        console.error('Update repair error:', { error: error.message, stack: error.stack });
+        console.error('Update repair error:', { message: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -678,28 +542,47 @@ app.delete('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req
             token: req.headers['x-csrf-token'] || req.body._csrf,
             cookie: req.cookies._csrf
         });
-        console.log('Delete repair', { id: req.params.id });
+        console.log('Delete repair attempt', { id: req.params.id });
         const repair = await Repair.findByIdAndDelete(req.params.id);
         if (!repair) {
             console.log('Repair not found', { id: req.params.id });
             return res.status(404).json({ message: 'Repair not found' });
         }
-        res.json({ message: 'Repair deleted' });
         console.log('Repair deleted', { repairId: repair.repairId });
+        res.json({ message: 'Repair deleted' });
     } catch (error) {
-        console.error('Delete repair error:', { error: error.message, stack: error.stack });
+        console.error('Delete repair error:', { message: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
+// Admin analytics
+app.get('/api/admin/analytics', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const totalRevenue = await Order.aggregate([
+            { $match: { status: 'Delivered' } },
+            { $group: { _id: null, total: { $sum: '$total' } } }
+        ]);
+        const totalOrders = await Order.countDocuments();
+        console.log('Analytics fetched', { totalRevenue: totalRevenue[0]?.total || 0, totalOrders });
+        res.json({
+            totalRevenue: totalRevenue[0]?.total || 0,
+            totalOrders
+        });
+    } catch (error) {
+        console.error('Analytics error:', { message: error.message });
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Admin users
 app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        console.log('Get admin users', { email: req.user.email });
         const users = await User.find().select('-password');
+        console.log('Users fetched', { count: users.length });
         res.json(users);
-        console.log('Admin users fetched', { count: users.length });
     } catch (error) {
-        console.error('Get users error:', error);
+        console.error('Get users error:', { message: error.message });
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -710,21 +593,17 @@ app.put('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res
             token: req.headers['x-csrf-token'] || req.body._csrf,
             cookie: req.cookies._csrf
         });
+        console.log('Update user attempt', { id: req.params.id, body: req.body });
         const { name, email, phone, role } = req.body;
-        console.log('Update user', { id: req.params.id });
-        const user = await User.findByIdAndUpdate(
-            req.params.id,
-            { name, email, phone, role },
-            { new: true }
-        ).select('-password');
+        const user = await User.findByIdAndUpdate(req.params.id, { name, email, phone, role }, { new: true });
         if (!user) {
             console.log('User not found', { id: req.params.id });
             return res.status(404).json({ message: 'User not found' });
         }
+        console.log('User updated', { email });
         res.json(user);
-        console.log('User updated', { email: user.email });
     } catch (error) {
-        console.error('Update user error:', { error: error.message, stack: error.stack });
+        console.error('Update user error:', { message: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -735,35 +614,16 @@ app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, 
             token: req.headers['x-csrf-token'] || req.body._csrf,
             cookie: req.cookies._csrf
         });
-        console.log('Delete user', { id: req.params.id });
+        console.log('Delete user attempt', { id: req.params.id });
         const user = await User.findByIdAndDelete(req.params.id);
         if (!user) {
             console.log('User not found', { id: req.params.id });
             return res.status(404).json({ message: 'User not found' });
         }
-        res.json({ message: 'User deleted' });
         console.log('User deleted', { email: user.email });
+        res.json({ message: 'User deleted' });
     } catch (error) {
-        console.error('Delete user error:', { error: error.message, stack: error.stack });
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-app.get('/api/admin/analytics', authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        console.log('Get analytics', { email: req.user.email });
-        const totalRevenue = await Order.aggregate([
-            { $match: { status: 'Delivered' } },
-            { $group: { _id: null, total: { $sum: '$total' } } }
-        ]);
-        const totalOrders = await Order.countDocuments();
-        res.json({
-            totalRevenue: totalRevenue[0]?.total || 0,
-            totalOrders
-        });
-        console.log('Analytics fetched', { totalRevenue: totalRevenue[0]?.total || 0, totalOrders });
-    } catch (error) {
-        console.error('Analytics error:', error);
+        console.error('Delete user error:', { message: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -788,10 +648,8 @@ app.use((err, req, res, next) => {
     res.status(500).json({ message: 'Server error' });
 });
 
-// Serve static files
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
+// Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
