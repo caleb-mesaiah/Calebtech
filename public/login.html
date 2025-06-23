@@ -52,7 +52,7 @@
         <h3 class="text-center mb-4" style="color: #1976D2;">Login</h3>
         <div class="alert alert-danger" id="errorAlert"></div>
         <form id="loginForm">
-            <input type="hidden" id="csrfToken">
+            <input type="hidden" id="csrfToken" name="_csrf">
             <div class="mb-3">
                 <label for="email" class="form-label">Email</label>
                 <input type="email" class="form-control" id="email" required>
@@ -99,10 +99,6 @@
                 console.log('Login form submitted');
                 const $button = $(this).find('button[type="submit"]');
                 $button.prop('disabled', true).text('Logging in...');
-                const userData = {
-                    email: $('#email').val(),
-                    password: $('#password').val()
-                };
                 const csrfToken = $('#csrfToken').val();
                 console.log('CSRF token for login:', csrfToken);
 
@@ -112,6 +108,12 @@
                     $button.prop('disabled', false).text('Login');
                     return;
                 }
+
+                const userData = {
+                    email: $('#email').val(),
+                    password: $('#password').val(),
+                    _csrf: csrfToken
+                };
 
                 $.ajax({
                     url: '/api/auth/login',
@@ -146,4 +148,4 @@
         });
     </script>
 </body>
-</html> 
+</html>
