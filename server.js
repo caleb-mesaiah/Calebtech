@@ -60,7 +60,15 @@ const csrfProtection = csurf({
         sameSite: 'strict',
         maxAge: 3600
     },
-    value: (req) => req.headers['x-csrf-token'] || req.body._csrf
+    value: (req) => {
+        const token = req.headers['x-csrf-token'] || req.body._csrf;
+        console.log('CSRF token validation', {
+            token,
+            cookie: req.cookies._csrf,
+            secret: req.csrfSecret
+        });
+        return token;
+    }
 });
 
 // Log Environment Variables
@@ -240,14 +248,11 @@ app.post('/api/auth/register', csrfProtection, async (req, res) => {
     }
 });
 
-app.post('/api/auth/login', csrfProtection, async (req, res) => {
+app.post('/api/auth/login', /* csrfProtection, */ async (req, res) => {
+    console.log('Login request body:', req.body);
     try {
-        console.log('CSRF token validated for login', { 
-            tokenReceived: req.headers['x-csrf-token'],
-            cookie: req.cookies._csrf
-        });
+        console.log('Login attempt', { email: req.body.email });
         const { email, password } = req.body;
-        console.log('Login attempt', { email });
         const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
         if (!user) {
             console.log('Login failed: User not found', { email });
