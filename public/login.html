@@ -127,8 +127,9 @@
                     console.log('CSRF token fetched:', response.csrfToken);
                 },
                 error: function(err) {
-                    console.error('CSRF token fetch error:', err);
-                    $('#errorAlert').text('Error fetching CSRF token. Please refresh the page.').show();
+                    const errorMessage = `CSRF token fetch error: ${err.status} ${err.statusText} - ${err.responseText || 'No response'}`;
+                    console.error(errorMessage);
+                    $('#errorAlert').text('Failed to load CSRF token. Please refresh the page or check your connection.').show();
                 }
             });
 
@@ -143,6 +144,12 @@
                 };
                 const csrfToken = $('#csrfToken').val();
 
+                if (!csrfToken) {
+                    $('#errorAlert').text('CSRF token not loaded. Please refresh the page.').show();
+                    $button.prop('disabled', false).text('Login');
+                    return;
+                }
+
                 $.ajax({
                     url: '/api/auth/login',
                     method: 'POST',
@@ -153,7 +160,6 @@
                     data: JSON.stringify(userData),
                     success: function(response) {
                         localStorage.setItem('token', response.token);
-                        // Adjust redirect based on server response structure
                         if (response.user?.role === 'admin' || response.role === 'admin') {
                             alert('Admin login successful!');
                             window.location.href = '/admin.html';
@@ -163,7 +169,8 @@
                         }
                     },
                     error: function(err) {
-                        console.error('Login error:', err);
+                        const errorMessage = `Login error: ${err.status} ${err.statusText} - ${err.responseJSON?.message || 'No response'}`;
+                        console.error(errorMessage);
                         $('#errorAlert').text(err.responseJSON?.message || 'Login failed. Please try again.').show();
                         $button.prop('disabled', false).text('Login');
                     }
