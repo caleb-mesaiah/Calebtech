@@ -115,8 +115,8 @@ const ProductSchema = new mongoose.Schema({
 });
 
 const OrderSchema = new mongoose.Schema({
-    orderId: { type: String, required: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
+    orderId: { type: String, required: true, unique: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     items: [{
         name: String,
         price: Number,
@@ -125,21 +125,20 @@ const OrderSchema = new mongoose.Schema({
     }],
     total: { type: Number, required: true },
     shippingAddress: String,
-    status: String,
+    status: { type: String, default: 'Pending' },
     createdAt: { type: Date, default: Date.now }
 });
 
 const RepairSchema = new mongoose.Schema({
-    repairId: { type: String, required: true },
-    email: String,
-    name: String,
+    repairId: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    email: { type: String, required: true },
     deviceType: String,
     deviceModel: String,
     issue: String,
     contactMethod: String,
     preferredDate: Date,
-    total: Number,
-    status: String,
+    status: { type: String, default: 'Pending' },
     image: String
 });
 
@@ -153,13 +152,13 @@ const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
-        password: process.env.EMAIL_PASSWORD
+        pass: process.env.EMAIL_PASS
     }
 });
 
 // Auth Middleware
 const authMiddleware = async (req, res, next) => {
-    const token = req.headers['authorization']?.split(' ')[1];
+    const token = req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'No token provided' });
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -167,7 +166,7 @@ const authMiddleware = async (req, res, next) => {
         if (!req.user) return res.status(401).json({ message: 'User not found' });
         next();
     } catch (error) {
-        console.error('Auth error:', error);
+        console.error('Auth middleware error:', error);
         res.status(401).json({ message: 'Invalid token' });
     }
 };
@@ -182,7 +181,7 @@ const adminMiddleware = (req, res, next) => {
 
 // Routes
 // CSRF Token
-app.get('/api/cs/csrf-token', csrfProtection, (req, res, next) => {
+app.get('/api/csrf-token', csrfProtection, (req, res, next) => {
     try {
         if (!req.csrfToken || typeof req.csrfToken !== 'function') {
             throw new Error('CSRF token function not available');
