@@ -126,10 +126,10 @@
                     $('#csrfToken').val(response.csrfToken);
                     console.log('CSRF token fetched:', response.csrfToken);
                 },
-                error: function(err) {
-                    const errorMessage = `CSRF token fetch error: ${err.status} ${err.statusText} - ${err.responseText || 'No response'}`;
+                error: function(xhr, status, error) {
+                    const errorMessage = `CSRF token fetch error: ${xhr.status} ${xhr.statusText} - ${xhr.responseText || 'No response'}`;
                     console.error(errorMessage);
-                    $('#errorAlert').text('Failed to load CSRF token. Please refresh the page or check your connection.').show();
+                    $('#errorAlert').text(`Failed to load CSRF token: ${xhr.status} ${xhr.statusText}. Please refresh or check your connection.`).show();
                 }
             });
 
@@ -168,10 +168,10 @@
                             window.location.href = '/products.html';
                         }
                     },
-                    error: function(err) {
-                        const errorMessage = `Login error: ${err.status} ${err.statusText} - ${err.responseJSON?.message || 'No response'}`;
+                    error: function(xhr, status, error) {
+                        const errorMessage = `Login error: ${xhr.status} ${xhr.statusText} - ${xhr.responseJSON?.message || 'No response'}`;
                         console.error(errorMessage);
-                        $('#errorAlert').text(err.responseJSON?.message || 'Login failed. Please try again.').show();
+                        $('#errorAlert').text(xhr.responseJSON?.message || `Login failed: ${xhr.status} ${xhr.statusText}. Please try again.`).show();
                         $button.prop('disabled', false).text('Login');
                     }
                 });
@@ -179,4 +179,4 @@
         });
     </script>
 </body>
-</html>
+</html> 
