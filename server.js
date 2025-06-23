@@ -24,7 +24,6 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-
 // CSP Header
 app.use((req, res, next) => {
     res.setHeader("Content-Security-Policy",
@@ -51,7 +50,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// CSRF Middleware
 // CSRF Middleware
 const csrfProtection = csrf({
     cookie: {
@@ -230,10 +228,18 @@ const adminMiddleware = (req, res, next) => {
 };
 
 // Routes
-app.get('/api/csrf-token', (req, res) => {
-    const token = req.csrfToken();
-    console.log('CSRF token generated', { token, cookies: req.cookies });
-    res.json({ csrfToken: token });
+app.get('/api/csrf-token', (req, res, next) => {
+    try {
+        const token = req.csrfToken();
+        console.log('CSRF token generated', { token, cookies: req.cookies });
+        res.json({ csrfToken: token });
+    } catch (error) {
+        console.error('CSRF token generation error:', {
+            message: error.message,
+            stack: error.stack
+        });
+        res.status(500).json({ message: 'Failed to generate CSRF token' });
+    }
 });
 
 app.post('/api/auth/register', csrfProtection, async (req, res) => {
@@ -775,7 +781,10 @@ app.use((err, req, res, next) => {
         });
         return res.status(400).json({ message: 'Invalid CSRF token' });
     }
-    console.error('Unexpected Error:', { error: err.message });
+    console.error('Unexpected Error:', {
+        message: err.message,
+        stack: err.stack
+    });
     res.status(500).json({ message: 'Server error' });
 });
 
