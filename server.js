@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const multer = require('multer');
-const cloudinary = require('cloudinary').v2; // Use v2 API
+const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const path = require('path');
 
@@ -26,7 +26,7 @@ try {
         message: error.message,
         stack: error.stack
     });
-    process.exit(1); // Exit if Cloudinary fails
+    process.exit(1);
 }
 
 // Multer storage for Cloudinary
@@ -47,6 +47,7 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE']
 }));
 app.use(cookieParser());
+console.log('Cookie-parser middleware applied');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -63,7 +64,7 @@ mongoose.connect(process.env.MONGODB_URI)
 const csrfProtection = csrf({
     cookie: {
         key: '_csrf',
-        secure: process.env.NODE_ENV === 'production', // false for local
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 3600
     },
@@ -81,6 +82,7 @@ const csrfProtection = csrf({
         return token;
     }
 });
+console.log('CSRF middleware initialized');
 
 // Apply CSRF protection selectively
 app.use((req, res, next) => {
@@ -109,12 +111,12 @@ const ProductSchema = new mongoose.Schema({
     stock: { type: Number, default: 0 },
     image: String,
     createdAt: { type: Date, default: Date.now },
-    deleted: { type: Boolean, default: false } // Soft deletion
+    deleted: { type: Boolean, default: false }
 });
 
 const OrderSchema = new mongoose.Schema({
-    orderId: { type: String, required: true, unique: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    orderId: { type: String, required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
     items: [{
         name: String,
         price: Number,
@@ -123,20 +125,21 @@ const OrderSchema = new mongoose.Schema({
     }],
     total: { type: Number, required: true },
     shippingAddress: String,
-    status: { type: String, default: 'Pending' },
+    status: String,
     createdAt: { type: Date, default: Date.now }
 });
 
 const RepairSchema = new mongoose.Schema({
-    repairId: { type: String, required: true, unique: true },
-    name: { type: String, required: true },
-    email: { type: String, required: true },
+    repairId: { type: String, required: true },
+    email: String,
+    name: String,
     deviceType: String,
     deviceModel: String,
     issue: String,
     contactMethod: String,
     preferredDate: Date,
-    status: { type: String, default: 'Pending' },
+    total: Number,
+    status: String,
     image: String
 });
 
@@ -150,13 +153,13 @@ const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        password: process.env.EMAIL_PASSWORD
     }
 });
 
 // Auth Middleware
 const authMiddleware = async (req, res, next) => {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = req.headers['authorization']?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'No token provided' });
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -164,7 +167,7 @@ const authMiddleware = async (req, res, next) => {
         if (!req.user) return res.status(401).json({ message: 'User not found' });
         next();
     } catch (error) {
-        console.error('Auth middleware error:', error);
+        console.error('Auth error:', error);
         res.status(401).json({ message: 'Invalid token' });
     }
 };
@@ -179,8 +182,11 @@ const adminMiddleware = (req, res, next) => {
 
 // Routes
 // CSRF Token
-app.get('/api/csrf-token', (req, res, next) => {
+app.get('/api/cs/csrf-token', csrfProtection, (req, res, next) => {
     try {
+        if (!req.csrfToken || typeof req.csrfToken !== 'function') {
+            throw new Error('CSRF token function not available');
+        }
         const token = req.csrfToken();
         console.log('CSRF token generated', { token, cookies: req.cookies });
         res.json({ csrfToken: token });
@@ -247,7 +253,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         if (!user) return res.status(400).json({ message: 'User not found' });
         const resetToken = Math.random().toString(36).slice(-8);
         user.resetToken = resetToken;
-        user.resetTokenExpiration = Date.now() + 3600000; // 1 hour
+        user.resetTokenExpiration = Date.now() + 3600000;
         await user.save();
         const mailOptions = {
             from: process.env.EMAIL_USER,
@@ -551,7 +557,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 }); 
