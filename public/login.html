@@ -64,7 +64,7 @@
             <button type="submit" class="btn btn-primary w-100">Login</button>
         </form>
         <p class="text-center mt-3">
-            <a href="/register.html" style="color: #42A5F5;">Create an account</a> | 
+            <a href="/register.html" style="color: #42A5F5;">Create an account...</a> | 
             <a href="/forgot-password.html" style="color: #42A5F5;">Forgot Password?</a>
         </p>
     </div>
@@ -125,10 +125,10 @@
                         console.log('Login successful:', response);
                         localStorage.setItem('token', response.token);
                         if (response.user?.role === 'admin') {
-                            alert('Admin login successful!');
+                            alert('Login successful!');
                             window.location.href = '/admin.html';
                         } else {
-                            alert('User login successful!');
+                            alert('Login successful!');
                             window.location.href = '/products.html';
                         }
                     },
