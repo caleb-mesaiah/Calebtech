@@ -107,6 +107,10 @@
             border-radius: 5px; 
             transition: opacity 0.3s ease;
         }
+        .alert { 
+            display: none; 
+            margin-bottom: 15px; 
+        }
         @media (max-width: 768px) {
             .admin-section { 
                 padding: 20px 0; 
@@ -135,6 +139,7 @@
                 <h2 style="color: #1976D2;">Admin Dashboard</h2>
                 <button class="btn btn-danger" id="logout">Logout</button>
             </div>
+            <div class="alert alert-danger" id="errorAlert"></div>
             <ul class="nav nav-tabs mb-4">
                 <li class="nav-item">
                     <a class="nav-link active" id="orders-tab" data-bs-toggle="tab" href="#orders">Orders</a>
@@ -229,18 +234,22 @@
                 </div>
                 <div class="modal-body">
                     <form id="addProductForm" enctype="multipart/form-data">
-                        <input type="hidden" id="csrfToken">
+                        <input type="hidden" id="csrfToken" name="_csrf">
                         <div class="mb-3">
                             <label for="productName" class="form-label">Name</label>
-                            <input type="text" class="form-control" id="productName" required>
+                            <input type="text" class="form-control" id="productName" name="name" required>
                         </div>
                         <div class="mb-3">
                             <label for="productPrice" class="form-label">Price (₦)</label>
-                            <input type="number" class="form-control" id="productPrice" required>
+                            <input type="number" class="form-control" id="productPrice" name="price" required>
                         </div>
                         <div class="mb-3">
                             <label for="productStock" class="form-label">Stock</label>
-                            <input type="number" class="form-control" id="productStock" required>
+                            <input type="number" class="form-control" id="productStock" name="stock" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="productBrand" class="form-label">Brand</label>
+                            <input type="text" class="form-control" id="productBrand" name="brand">
                         </div>
                         <div class="mb-3">
                             <label for="productImage" class="form-label">Product Image</label>
@@ -248,7 +257,7 @@
                         </div>
                         <div class="mb-3">
                             <label for="productDescription" class="form-label">Description</label>
-                            <textarea class="form-control" id="productDescription" rows="4"></textarea>
+                            <textarea class="form-control" id="productDescription" name="description" rows="4"></textarea>
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Add Product</button>
                     </form>
@@ -268,18 +277,22 @@
                 <div class="modal-body">
                     <form id="editProductForm" enctype="multipart/form-data">
                         <input type="hidden" id="editProductId">
-                        <input type="hidden" id="editCsrfToken">
+                        <input type="hidden" id="editCsrfToken" name="_csrf">
                         <div class="mb-3">
                             <label for="editProductName" class="form-label">Name</label>
-                            <input type="text" class="form-control" id="editProductName" required>
+                            <input type="text" class="form-control" id="editProductName" name="name" required>
                         </div>
                         <div class="mb-3">
                             <label for="editProductPrice" class="form-label">Price (₦)</label>
-                            <input type="number" class="form-control" id="editProductPrice" required>
+                            <input type="number" class="form-control" id="editProductPrice" name="price" required>
                         </div>
                         <div class="mb-3">
                             <label for="editProductStock" class="form-label">Stock</label>
-                            <input type="number" class="form-control" id="editProductStock" required>
+                            <input type="number" class="form-control" id="editProductStock" name="stock" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editProductBrand" class="form-label">Brand</label>
+                            <input type="text" class="form-control" id="editProductBrand" name="brand">
                         </div>
                         <div class="mb-3">
                             <label for="editProductImage" class="form-label">Product Image</label>
@@ -288,9 +301,47 @@
                         </div>
                         <div class="mb-3">
                             <label for="editProductDescription" class="form-label">Description</label>
-                            <textarea class="form-control" id="editProductDescription" rows="4"></textarea>
+                            <textarea class="form-control" id="editProductDescription" name="description" rows="4"></textarea>
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Update Product</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal fade" id="editUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editUserForm">
+                        <input type="hidden" id="editUserId">
+                        <input type="hidden" id="editUserCsrfToken" name="_csrf">
+                        <div class="mb-3">
+                            <label for="editUserName" class="form-label">Name</label>
+                            <input type="text" class="form-control" id="editUserName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editUserEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="editUserEmail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editUserPhone" class="form-label">Phone</label>
+                            <input type="tel" class="form-control" id="editUserPhone">
+                        </div>
+                        <div class="mb-3">
+                            <label for="editUserRole" class="form-label">Role</label>
+                            <select class="form-control" id="editUserRole" required>
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Update User</button>
                     </form>
                 </div>
             </div>
@@ -311,25 +362,38 @@
             // Authentication check
             const token = localStorage.getItem('token');
             if (!token) {
-                alert('Please login as an admin to access this page.');
-                window.location.href = 'login.html';
+                $('#errorAlert').text('Please login as an admin to access this page.').show();
+                setTimeout(() => window.location.href = 'login.html', 1000);
                 return;
             }
 
-            // Fetch CSRF token
-            $.ajax({
-                url: '/api/csrf-token',
-                method: 'GET',
-                xhrFields: { withCredentials: true },
-                success: function(response) {
-                    $('#csrfToken, #editCsrfToken, #editUserCsrfToken').val(response.csrfToken);
-                    console.log('CSRF token fetched:', response.csrfToken);
-                },
-                error: function(err) {
-                    console.error('CSRF token fetch error:', err);
-                    alert('Error fetching CSRF token. Please refresh the page.');
-                }
-            });
+            // Fetch CSRF token with retry
+            function fetchCsrfToken(retries = 3, delay = 1000) {
+                $.ajax({
+                    url: '/api/csrf-token',
+                    method: 'GET',
+                    xhrFields: { withCredentials: true },
+                    success: function(response) {
+                        console.log('CSRF token fetched:', response.csrfToken);
+                        $('#csrfToken, #editCsrfToken, #editUserCsrfToken').val(response.csrfToken);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('CSRF token fetch error:', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText || 'No response',
+                            error: error,
+                            retriesLeft: retries
+                        });
+                        if (retries > 0) {
+                            setTimeout(() => fetchCsrfToken(retries - 1, delay * 2), delay);
+                        } else {
+                            $('#errorAlert').text('Failed to load CSRF token. Please refresh.').show();
+                        }
+                    }
+                });
+            }
+            fetchCsrfToken();
 
             // Verify admin role
             $.ajax({
@@ -338,16 +402,18 @@
                 headers: { 'Authorization': `Bearer ${token}` },
                 success: function(user) {
                     if (user.role !== 'admin') {
-                        alert('Access denied. Admin privileges required.');
+                        $('#errorAlert').text('Access denied. Admin privileges required.').show();
                         localStorage.removeItem('token');
-                        window.location.href = 'index.html';
+                        setTimeout(() => window.location.href = 'index.html', 1000);
                         return;
                     }
+                    console.log('Admin verified:', user.email);
                 },
-                error: function(err) {
-                    alert('Session expired. Please login again.');
+                error: function(xhr) {
+                    console.error('Profile error:', xhr.responseJSON?.message || 'Server error');
+                    $('#errorAlert').text('Session expired. Please login again.').show();
                     localStorage.removeItem('token');
-                    window.location.href = 'login.html';
+                    setTimeout(() => window.location.href = 'login.html', 1000);
                 }
             });
 
@@ -410,10 +476,10 @@
                             });
                         }
                     },
-                    error: function(err) {
-                        console.error('Load orders error:', err);
+                    error: function(xhr) {
+                        console.error('Load orders error:', xhr.responseJSON?.message || 'Server error');
                         $('#orderList').append('<p class="text-center">Error loading orders.</p>');
-                        alert('Error loading orders: ' + (err.responseJSON?.message || 'Server error'));
+                        $('#errorAlert').text('Error loading orders: ' + (xhr.responseJSON?.message || 'Server error')).show();
                     }
                 });
             }
@@ -457,10 +523,10 @@
                             });
                         }
                     },
-                    error: function(err) {
-                        console.error('Load repairs error:', err);
+                    error: function(xhr) {
+                        console.error('Load repairs error:', xhr.responseJSON?.message || 'Server error');
                         $('#repairsTableBody').append('<tr><td colspan="9" class="text-center">Error loading repairs.</td></tr>');
-                        alert('Error loading repairs: ' + (err.responseJSON?.message || 'Server error'));
+                        $('#errorAlert').text('Error loading repairs: ' + (xhr.responseJSON?.message || 'Server error')).show();
                     }
                 });
             }
@@ -487,6 +553,7 @@
                                                     <h5>${product.name}</h5>
                                                     <p>Price: ₦${product.price.toLocaleString()}</p>
                                                     <p>Stock: ${product.stock}</p>
+                                                    <p>Brand: ${product.brand || 'N/A'}</p>
                                                 </div>
                                             </div>
                                             <button class="btn btn-warning btn-sm edit-product" data-id="${product._id}" 
@@ -502,10 +569,10 @@
                             });
                         }
                     },
-                    error: function(err) {
-                        console.error('Load products error:', err);
+                    error: function(xhr) {
+                        console.error('Load products error:', xhr.responseJSON?.message || 'Server error');
                         $('#productList').append('<p class="text-center">Error loading products.</p>');
-                        alert('Error loading products: ' + (err.responseJSON?.message || 'Server error'));
+                        $('#errorAlert').text('Error loading products: ' + (xhr.responseJSON?.message || 'Server error')).show();
                     }
                 });
             }
@@ -541,10 +608,10 @@
                             });
                         }
                     },
-                    error: function(err) {
-                        console.error('Load users error:', err);
+                    error: function(xhr) {
+                        console.error('Load users error:', xhr.responseJSON?.message || 'Server error');
                         $('#userList').append('<p class="text-center">Error loading users.</p>');
-                        alert('Error loading users: ' + (err.responseJSON?.message || 'Server error'));
+                        $('#errorAlert').text('Error loading users: ' + (xhr.responseJSON?.message || 'Server error')).show();
                     }
                 });
             }
@@ -563,13 +630,13 @@
                         topProducts.empty();
                         topProducts.append('<li>Data unavailable.</li>');
                     },
-                    error: function(err) {
-                        console.error('Load analytics error:', err);
+                    error: function(xhr) {
+                        console.error('Load analytics error:', xhr.responseJSON?.message || 'Server error');
                         $('#totalSales').text('Error');
                         $('#totalOrders').text('Error');
                         $('#pendingOrders').text('Error');
                         $('#topProducts').append('<li>Error loading analytics.</li>');
-                        alert('Error loading analytics: ' + (err.responseJSON?.message || 'Server error'));
+                        $('#errorAlert').text('Error loading analytics: ' + (xhr.responseJSON?.message || 'Server error')).show();
                     }
                 });
             }
@@ -577,35 +644,46 @@
             // Add product
             $('#addProductForm').submit(function(e) {
                 e.preventDefault();
-                const formData = new FormData();
-                formData.append('name', $('#productName').val());
-                formData.append('price', parseFloat($('#productPrice').val()));
-                formData.append('stock', parseInt($('#productStock').val()));
-                formData.append('description', $('#productDescription').val());
-                formData.append('brand', 'Generic');
-                const imageFile = $('#productImage')[0].files[0];
-                if (imageFile) {
-                    formData.append('image', imageFile);
+                const $button = $(this).find('button[type="submit"]');
+                $button.prop('disabled', true).text('Adding Product...');
+                const csrfToken = $('#csrfToken').val();
+                console.log('Add product form submitted', { csrfToken });
+                if (!csrfToken) {
+                    console.error('No CSRF token available');
+                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                    $button.prop('disabled', false).text('Add Product');
+                    return;
                 }
+                const formData = new FormData(this);
+                formData.append('_csrf', csrfToken);
+                console.log('FormData contents:', [...formData.entries()]);
                 $.ajax({
                     url: '/api/products',
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': $('#csrfToken').val()
+                        'X-CSRF-Token': csrfToken
                     },
                     data: formData,
                     processData: false,
                     contentType: false,
                     success: function(response) {
+                        console.log('Product added successfully:', response);
                         alert('Product added.');
                         $('#addProductModal').modal('hide');
                         $('#addProductForm')[0].reset();
+                        $button.prop('disabled', false).text('Add Product');
                         loadProducts();
                     },
-                    error: function(err) {
-                        console.error('Add product error:', err);
-                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    error: function(xhr) {
+                        console.error('Add product error:', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText || 'No response',
+                            error: xhr.responseJSON?.message
+                        });
+                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
+                        $button.prop('disabled', false).text('Add Product');
                     }
                 });
             });
@@ -617,41 +695,53 @@
                 $('#editProductPrice').val($(this).data('price'));
                 $('#editProductStock').val($(this).data('stock'));
                 $('#editProductDescription').val($(this).data('description'));
+                $('#editProductBrand').val($(this).data('brand'));
                 $('#editProductModal').modal('show');
             });
 
             $('#editProductForm').submit(function(e) {
                 e.preventDefault();
+                const $button = $(this).find('button[type="submit"]');
+                $button.prop('disabled', true).text('Updating Product...');
                 const productId = $('#editProductId').val();
-                const formData = new FormData();
-                formData.append('name', $('#editProductName').val());
-                formData.append('price', parseFloat($('#editProductPrice').val()));
-                formData.append('stock', parseInt($('#editProductStock').val()));
-                formData.append('description', $('#editProductDescription').val());
-                formData.append('brand', 'Generic');
-                const imageFile = $('#editProductImage')[0].files[0];
-                if (imageFile) {
-                    formData.append('image', imageFile);
+                const csrfToken = $('#editCsrfToken').val();
+                console.log('Edit product form submitted', { productId, csrfToken });
+                if (!csrfToken) {
+                    console.error('No CSRF token available');
+                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                    $button.prop('disabled', false).text('Update Product');
+                    return;
                 }
+                const formData = new FormData(this);
+                formData.append('_csrf', csrfToken);
+                console.log('FormData contents:', [...formData.entries()]);
                 $.ajax({
                     url: `/api/products/${productId}`,
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': $('#editCsrfToken').val()
+                        'X-CSRF-Token': csrfToken
                     },
                     data: formData,
                     processData: false,
                     contentType: false,
                     success: function(response) {
+                        console.log('Product updated successfully:', response);
                         alert('Product updated.');
                         $('#editProductModal').modal('hide');
                         $('#editProductForm')[0].reset();
+                        $button.prop('disabled', false).text('Update Product');
                         loadProducts();
                     },
-                    error: function(err) {
-                        console.error('Edit product error:', err);
-                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    error: function(xhr) {
+                        console.error('Edit product error:', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText || 'No response',
+                            error: xhr.responseJSON?.message
+                        });
+                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
+                        $button.prop('disabled', false).text('Update Product');
                     }
                 });
             });
@@ -660,20 +750,34 @@
             $(document).on('click', '.delete-product', function() {
                 if (!confirm('Are you sure you want to delete this product?')) return;
                 const productId = $(this).data('id');
+                const csrfToken = $('#csrfToken').val();
+                console.log('Delete product attempt', { productId, csrfToken });
+                if (!csrfToken) {
+                    console.error('No CSRF token available');
+                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                    return;
+                }
                 $.ajax({
                     url: `/api/products/${productId}`,
                     method: 'DELETE',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': $('#csrfToken').val()
+                        'X-CSRF-Token': csrfToken
                     },
+                    data: { _csrf: csrfToken },
                     success: function(response) {
+                        console.log('Product deleted:', response);
                         alert('Product deleted.');
                         $(`[data-id="${productId}"]`).remove();
                     },
-                    error: function(err) {
-                        console.error('Delete product error:', err);
-                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    error: function(xhr) {
+                        console.error('Delete product error:', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText || 'No response',
+                            error: xhr.responseJSON?.message
+                        });
+                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
                     }
                 });
             });
@@ -684,16 +788,22 @@
                 const status = $(this).val();
                 const isOrder = $(this).hasClass('order-status');
                 const endpoint = isOrder ? 'orders' : 'repairs';
-                console.log(`Updating ${endpoint} status:`, { id, status });
+                const csrfToken = $('#csrfToken').val();
+                console.log(`Updating ${endpoint} status:`, { id, status, csrfToken });
+                if (!csrfToken) {
+                    console.error('No CSRF token available');
+                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                    return;
+                }
                 $.ajax({
                     url: `/api/admin/${endpoint}/${id}`,
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': $('#csrfToken').val()
+                        'X-CSRF-Token': csrfToken
                     },
                     contentType: 'application/json',
-                    data: JSON.stringify({ status }),
+                    data: JSON.stringify({ status, _csrf: csrfToken }),
                     success: function(response) {
                         console.log(`${endpoint} status updated:`, response);
                         alert(`${isOrder ? 'Order' : 'Repair'} status updated.`);
@@ -704,9 +814,14 @@
                             loadAnalytics();
                         }
                     },
-                    error: function(err) {
-                        console.error(`Update ${endpoint} status error:`, err);
-                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    error: function(xhr) {
+                        console.error(`Update ${endpoint} status error:`, {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText || 'No response',
+                            error: xhr.responseJSON?.message
+                        });
+                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
                     }
                 });
             });
@@ -715,21 +830,35 @@
             $(document).on('click', '.delete-order', function() {
                 if (!confirm('Are you sure you want to delete this order?')) return;
                 const orderId = $(this).data('id');
+                const csrfToken = $('#csrfToken').val();
+                console.log('Delete order attempt', { orderId, csrfToken });
+                if (!csrfToken) {
+                    console.error('No CSRF token available');
+                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                    return;
+                }
                 $.ajax({
                     url: `/api/admin/orders/${orderId}`,
                     method: 'DELETE',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': $('#csrfToken').val()
+                        'X-CSRF-Token': csrfToken
                     },
+                    data: { _csrf: csrfToken },
                     success: function(response) {
+                        console.log('Order deleted:', response);
                         alert('Order deleted.');
                         $(`[data-id="${orderId}"]`).remove();
                         loadAnalytics();
                     },
-                    error: function(err) {
-                        console.error('Delete order error:', err);
-                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    error: function(xhr) {
+                        console.error('Delete order error:', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText || 'No response',
+                            error: xhr.responseJSON?.message
+                        });
+                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
                     }
                 });
             });
@@ -738,101 +867,94 @@
             $(document).on('click', '.delete-repair', function() {
                 if (!confirm('Are you sure you want to delete this repair?')) return;
                 const repairId = $(this).data('id');
+                const csrfToken = $('#csrfToken').val();
+                console.log('Delete repair attempt', { repairId, csrfToken });
+                if (!csrfToken) {
+                    console.error('No CSRF token available');
+                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                    return;
+                }
                 $.ajax({
                     url: `/api/admin/repairs/${repairId}`,
                     method: 'DELETE',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': $('#csrfToken').val()
+                        'X-CSRF-Token': csrfToken
                     },
+                    data: { _csrf: csrfToken },
                     success: function(response) {
+                        console.log('Repair deleted:', response);
                         alert('Repair deleted.');
                         $(`[data-id="${repairId}"]`).remove();
                     },
-                    error: function(err) {
-                        console.error('Delete repair error:', err);
-                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    error: function(xhr) {
+                        console.error('Delete repair error:', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText || 'No response',
+                            error: xhr.responseJSON?.message
+                        });
+                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
                     }
                 });
             });
 
             // Edit user
             $(document).on('click', '.edit-user', function() {
-                const userId = $(this).data('id');
-                const name = $(this).data('name');
-                const email = $(this).data('email');
-                const role = $(this).data('role');
-                const phone = $(this).data('phone');
-                const modalHtml = `
-                    <div class="modal fade" id="editUserModal" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Edit User</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <form id="editUserForm">
-                                        <input type="hidden" id="editUserId" value="${userId}">
-                                        <input type="hidden" id="editUserCsrfToken">
-                                        <div class="mb-3">
-                                            <label for="editUserName" class="form-label">Name</label>
-                                            <input type="text" class="form-control" id="editUserName" value="${name}" required>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="editUserEmail" class="form-label">Email</label>
-                                            <input type="email" class="form-control" id="editUserEmail" value="${email}" required>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="editUserPhone" class="form-label">Phone</label>
-                                            <input type="tel" class="form-control" id="editUserPhone" value="${phone}">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="editUserRole" class="form-label">Role</label>
-                                            <select class="form-control" id="editUserRole" required>
-                                                <option value="user" ${role === 'user' ? 'selected' : ''}>User</option>
-                                                <option value="admin" ${role === 'admin' ? 'selected' : ''}>Admin</option>
-                                            </select>
-                                        </div>
-                                        <button type="submit" class="btn btn-primary w-100">Update User</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                $('body').append(modalHtml);
-                $('#editUserCsrfToken').val($('#csrfToken').val());
+                $('#editUserId').val($(this).data('id'));
+                $('#editUserName').val($(this).data('name'));
+                $('#editUserEmail').val($(this).data('email'));
+                $('#editUserPhone').val($(this).data('phone'));
+                $('#editUserRole').val($(this).data('role'));
                 $('#editUserModal').modal('show');
             });
 
-            $(document).on('submit', '#editUserForm', function(e) {
+            $('#editUserForm').submit(function(e) {
                 e.preventDefault();
+                const $button = $(this).find('button[type="submit"]');
+                $button.prop('disabled', true).text('Updating User...');
                 const userId = $('#editUserId').val();
+                const csrfToken = $('#editUserCsrfToken').val();
+                console.log('Edit user form submitted', { userId, csrfToken });
+                if (!csrfToken) {
+                    console.error('No CSRF token available');
+                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                    $button.prop('disabled', false).text('Update User');
+                    return;
+                }
                 const userData = {
                     name: $('#editUserName').val(),
                     email: $('#editUserEmail').val(),
                     phone: $('#editUserPhone').val(),
-                    role: $('#editUserRole').val()
+                    role: $('#editUserRole').val(),
+                    _csrf: csrfToken
                 };
                 $.ajax({
                     url: `/api/admin/users/${userId}`,
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': $('#editUserCsrfToken').val()
+                        'X-CSRF-Token': csrfToken
                     },
                     contentType: 'application/json',
                     data: JSON.stringify(userData),
                     success: function(response) {
+                        console.log('User updated successfully:', response);
                         alert('User updated.');
                         $('#editUserModal').modal('hide');
-                        $('#editUserModal').remove();
+                        $('#editUserForm')[0].reset();
+                        $button.prop('disabled', false).text('Update User');
                         loadUsers();
                     },
-                    error: function(err) {
-                        console.error('Edit user error:', err);
-                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    error: function(xhr) {
+                        console.error('Edit user error:', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText || 'No response',
+                            error: xhr.responseJSON?.message
+                        });
+                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
+                        $button.prop('disabled', false).text('Update User');
                     }
                 });
             });
@@ -841,20 +963,34 @@
             $(document).on('click', '.delete-user', function() {
                 if (!confirm('Are you sure you want to delete this user?')) return;
                 const userId = $(this).data('id');
+                const csrfToken = $('#csrfToken').val();
+                console.log('Delete user attempt', { userId, csrfToken });
+                if (!csrfToken) {
+                    console.error('No CSRF token available');
+                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                    return;
+                }
                 $.ajax({
                     url: `/api/admin/users/${userId}`,
                     method: 'DELETE',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': $('#csrfToken').val()
+                        'X-CSRF-Token': csrfToken
                     },
+                    data: { _csrf: csrfToken },
                     success: function(response) {
+                        console.log('User deleted:', response);
                         alert('User deleted.');
                         $(`[data-id="${userId}"]`).remove();
                     },
-                    error: function(err) {
-                        console.error('Delete user error:', err);
-                        alert('Error: ' + (err.responseJSON?.message || 'Server error'));
+                    error: function(xhr) {
+                        console.error('Delete user error:', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText || 'No response',
+                            error: xhr.responseJSON?.message
+                        });
+                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
                     }
                 });
             });
@@ -875,4 +1011,4 @@
         });
     </script>
 </body>
-</html> 
+</html>
