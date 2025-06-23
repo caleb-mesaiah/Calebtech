@@ -25,7 +25,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// CSP Header to allow unsafe-eval and third-party scripts
+// CSP Header
 app.use((req, res, next) => {
     res.setHeader("Content-Security-Policy", 
         "default-src 'self'; " +
@@ -58,8 +58,9 @@ const csrfProtection = csurf({
         httpOnly: true,
         secure: true,
         sameSite: 'strict',
-        maxAge: 3600 // 1 hour
-    }
+        maxAge: 3600
+    },
+    value: (req) => req.headers['x-csrf-token'] || req.body._csrf
 });
 
 // Log Environment Variables
