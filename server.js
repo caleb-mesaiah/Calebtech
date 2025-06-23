@@ -27,7 +27,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // CSP Header
 app.use((req, res, next) => {
-    res.setHeader("Content-Security-Policy", 
+    res.setHeader("Content-Security-Policy",
         "default-src 'self'; " +
         "script-src 'self' https://code.jquery.com https://cdn.jsdelivr.net 'unsafe-eval'; " +
         "style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
@@ -52,7 +52,35 @@ app.use((req, res, next) => {
 });
 
 // CSRF Middleware
-const csrfProtection = csrf({ cookie: true });
+const csrfProtection = csrf({
+    cookie: {
+        key: '_csrf',
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 3600
+    },
+    value: (req) => {
+        const token = req.headers['x-csrf-token'] || req.body._csrf || req.query._csrf;
+        console.log('CSRF token validation', {
+            token,
+            cookie: req.cookies._csrf,
+            headers: req.headers['x-csrf-token'],
+            body: req.body._csrf,
+            query: req.query._csrf,
+            url: req.url,
+            method: req.method
+        });
+        return token;
+    }
+});
+
+// Apply CSRF protection selectively
+app.use((req, res, next) => {
+    if (req.method === 'GET' || req.path === '/api/auth/login' || req.path === '/api/csrf-token') {
+        return next();
+    }
+    csrfProtection(req, res, next);
+});
 
 // Log Environment Variables
 console.log('Environment variables:', {
@@ -89,7 +117,7 @@ const storage = new CloudinaryStorage({
 const upload = multer({ storage });
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log('MongoDB connected', { database: mongoose.connection.db.databaseName }))
     .catch(err => console.error('MongoDB connection error:', err));
 
@@ -202,7 +230,7 @@ const adminMiddleware = (req, res, next) => {
 };
 
 // Routes
-app.get('/api/csrf-token', csrfProtection, (req, res) => {
+app.get('/api/csrf-token', (req, res) => {
     const token = req.csrfToken();
     console.log('CSRF token generated', { token, cookies: req.cookies });
     res.json({ csrfToken: token });
@@ -233,13 +261,9 @@ app.post('/api/auth/register', csrfProtection, async (req, res) => {
     }
 });
 
-app.post('/api/auth/login', csrfProtection, async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
     console.log('Login request body:', req.body);
     try {
-        console.log('CSRF token validated for login', {
-            token: req.headers['x-csrf-token'] || req.body._csrf,
-            cookie: req.cookies._csrf
-        });
         const { email, password } = req.body;
         console.log('Login attempt', { email });
         const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
@@ -286,7 +310,7 @@ app.post('/api/auth/forgot-password', csrfProtection, async (req, res) => {
         }
         const token = Math.random().toString(36).substring(2);
         user.resetPasswordToken = token;
-        user.resetPasswordExpires = Date.now() + 1e6; // 1 hour
+        user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
         await user.save();
         const mailOptions = {
             from: process.env.EMAIL_USER,
@@ -310,7 +334,7 @@ app.post('/api/auth/reset-password', csrfProtection, async (req, res) => {
             cookie: req.cookies._csrf
         });
         const { token, newPassword } = req.body;
-        console.log('Reset password attempt', { id: token });
+        console.log('Reset password attempt', { token });
         const user = await User.findOne({
             resetPasswordToken: token,
             resetPasswordExpires: { $gt: Date.now() }
@@ -357,7 +381,7 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
-app.post('/api/products', authMiddleware, adminMiddleware, csrfProtection, upload.single('image'), async (req, res) => {
+app.post('/api/products', authMiddleware, adminMiddleware, upload.single('image'), async (req, res) => {
     try {
         console.log('CSRF token validated for product addition', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
@@ -391,7 +415,7 @@ app.post('/api/products', authMiddleware, adminMiddleware, csrfProtection, uploa
     }
 });
 
-app.put('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection, upload.single('image'), async (req, res) => {
+app.put('/api/products/:id', authMiddleware, adminMiddleware, upload.single('image'), async (req, res) => {
     try {
         console.log('CSRF token validated for product update', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
@@ -431,7 +455,7 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection, up
     }
 });
 
-app.delete('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
+app.delete('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         console.log('CSRF token validated for product deletion', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
@@ -451,7 +475,7 @@ app.delete('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection,
     }
 });
 
-app.post('/api/orders', authMiddleware, csrfProtection, async (req, res) => {
+app.post('/api/orders', authMiddleware, async (req, res) => {
     try {
         console.log('CSRF token validated for order creation', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
@@ -496,7 +520,7 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
     }
 });
 
-app.post('/api/repairs', csrfProtection, async (req, res) => {
+app.post('/api/repairs', async (req, res) => {
     try {
         console.log('CSRF token validated for repair creation', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
@@ -546,7 +570,7 @@ app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) =
     }
 });
 
-app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
+app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         console.log('CSRF token validated for order update', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
@@ -578,7 +602,7 @@ app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtection
     }
 });
 
-app.delete('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
+app.delete('/api/admin/orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         console.log('CSRF token validated for order deletion', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
@@ -610,7 +634,7 @@ app.get('/api/admin/repairs', authMiddleware, adminMiddleware, async (req, res) 
     }
 });
 
-app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
+app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         console.log('CSRF token validated for repair update', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
@@ -642,14 +666,14 @@ app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtectio
     }
 });
 
-app.delete('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
+app.delete('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         console.log('CSRF token validated for repair deletion', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
             cookie: req.cookies._csrf
         });
         console.log('Delete repair', { id: req.params.id });
-        const repair = await Repair.findByIdAndDelete(req.params.id);
+        const repair = await Product.findByIdAndDelete(req.params.id);
         if (!repair) {
             console.log('Repair not found', { id: req.params.id });
             return res.status(404).json({ message: 'Repair not found' });
@@ -674,7 +698,7 @@ app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) =>
     }
 });
 
-app.put('/api/admin/users/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
+app.put('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         console.log('CSRF token validated for user update', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
@@ -699,7 +723,7 @@ app.put('/api/admin/users/:id', authMiddleware, adminMiddleware, csrfProtection,
     }
 });
 
-app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
+app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         console.log('CSRF token validated for user deletion', {
             token: req.headers['x-csrf-token'] || req.body._csrf,
