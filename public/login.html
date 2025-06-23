@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Caleb Messiah Tech</title>
+    <title>Login - CalebTech</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -11,16 +11,11 @@
             font-family: 'Poppins', sans-serif; 
             background-color: #90CAF9; 
             color: #0D47A1; 
-            position: relative; 
-            transition: filter 0.5s ease; 
             display: flex; 
             justify-content: center; 
             align-items: center; 
             min-height: 100vh; 
             margin: 0; 
-        }
-        .loader-active body { 
-            filter: blur(5px); 
         }
         .auth-container { 
             background-color: #E1F5FE; 
@@ -40,35 +35,6 @@
         .form-label { 
             color: #1976D2; 
         }
-        .loader { 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            height: 100vh; 
-            width: 100%; 
-            background: rgba(255, 255, 255, 0.8); 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            z-index: 9999; 
-            transition: opacity 0.5s ease; 
-        }
-        .loader.hidden { 
-            opacity: 0; 
-            pointer-events: none; 
-        }
-        .spinner { 
-            width: 50px; 
-            height: 50px; 
-            border: 5px solid #42A5F5; 
-            border-top: 5px solid #9bfbcb; 
-            border-radius: 50%; 
-            animation: spin 1s linear infinite; 
-        }
-        @keyframes spin { 
-            0% { transform: rotate(0deg); } 
-            100% { transform: rotate(360deg); } 
-        }
         .alert { 
             display: none; 
             margin-bottom: 15px; 
@@ -82,9 +48,6 @@
     </style>
 </head>
 <body>
-    <div id="loader" class="loader">
-        <div class="spinner"></div>
-    </div>
     <div class="auth-container">
         <h3 class="text-center mb-4" style="color: #1976D2;">Login</h3>
         <div class="alert alert-danger" id="errorAlert"></div>
@@ -107,65 +70,17 @@
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    $(document).ready(function() {
-        console.log('Initiating CSRF token fetch');
-        $.ajax({
-            url: '/api/csrf-token',
-            method: 'GET',
-            xhrFields: { withCredentials: true },
-            success: function(response) {
-                console.log('CSRF token fetched:', response.csrfToken);
-                $('#csrfToken').val(response.csrfToken);
-            },
-            error: function(xhr, status, error) {
-                const errorDetails = {
-                    status: xhr.status,
-                    statusText: xhr.statusText,
-                    responseText: xhr.responseText || 'No response',
-                    error: error
-                };
-                console.error('CSRF token fetch error:', JSON.stringify(errorDetails, null, 2));
-                $('#errorAlert').text(`Failed to load CSRF token: ${xhr.status} ${xhr.statusText}. Please refresh.`).show();
-            }
-        });
-
-        $('#loginForm').submit(function(e) {
-            e.preventDefault();
-            console.log('Login form submitted');
-            const $button = $(this).find('button[type="submit"]');
-            $button.prop('disabled', true).text('Logging in...');
-            const userData = {
-                email: $('#email').val(),
-                password: $('#password').val()
-            };
-            const csrfToken = $('#csrfToken').val();
-            console.log('CSRF token for login:', csrfToken);
-
-            if (!csrfToken) {
-                console.error('No CSRF token available');
-                $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
-                $button.prop('disabled', false).text('Login');
-                return;
-            }
-
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            console.log('Initiating CSRF token fetch');
             $.ajax({
-                url: '/api/auth/login',
-                method: 'POST',
-                headers: { 'X-CSRF-Token': csrfToken },
-                contentType: 'application/json',
-                data: JSON.stringify(userData),
+                url: '/api/csrf-token',
+                method: 'GET',
+                xhrFields: { withCredentials: true },
                 success: function(response) {
-                    console.log('Login successful:', response);
-                    localStorage.setItem('token', response.token);
-                    if (response.user?.role === 'admin') {
-                        alert('Admin login successful!');
-                        window.location.href = '/admin.html';
-                    } else {
-                        alert('User login successful!');
-                        window.location.href = '/products.html';
-                    }
+                    console.log('CSRF token fetched:', response.csrfToken);
+                    $('#csrfToken').val(response.csrfToken);
                 },
                 error: function(xhr, status, error) {
                     const errorDetails = {
@@ -174,11 +89,61 @@
                         responseText: xhr.responseText || 'No response',
                         error: error
                     };
-                    console.error('Login error:', JSON.stringify(errorDetails, null, 2));
-                    $('#errorAlert').text(xhr.responseJSON?.message || `Login failed: ${xhr.status} ${xhr.statusText}.`).show();
-                    $button.prop('disabled', false).text('Login');
+                    console.error('CSRF token fetch error:', JSON.stringify(errorDetails, null, 4));
+                    $('#errorAlert').text(`Failed to load CSRF token: ${xhr.status} ${xhr.statusText}. Please refresh.`).show();
                 }
             });
+
+            $('#loginForm').submit(function(e) {
+                e.preventDefault();
+                console.log('Login form submitted');
+                const $button = $(this).find('button[type="submit"]');
+                $button.prop('disabled', true).text('Logging in...');
+                const userData = {
+                    email: $('#email').val(),
+                    password: $('#password').val()
+                };
+                const csrfToken = $('#csrfToken').val();
+                console.log('CSRF token for login:', csrfToken);
+
+                if (!csrfToken) {
+                    console.error('No CSRF token available');
+                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                    $button.prop('disabled', false).text('Login');
+                    return;
+                }
+
+                $.ajax({
+                    url: '/api/auth/login',
+                    method: 'POST',
+                    headers: { 'X-CSRF-Token': csrfToken },
+                    contentType: 'application/json',
+                    data: JSON.stringify(userData),
+                    success: function(response) {
+                        console.log('Login successful:', response);
+                        localStorage.setItem('token', response.token);
+                        if (response.user?.role === 'admin') {
+                            alert('Admin login successful!');
+                            window.location.href = '/admin.html';
+                        } else {
+                            alert('User login successful!');
+                            window.location.href = '/products.html';
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        const errorDetails = {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText || 'No response',
+                            error: error
+                        };
+                        console.error('Login error:', JSON.stringify(errorDetails, null, 4));
+                        $('#errorAlert').text(xhr.responseJSON?.message || `Login failed: ${xhr.status} ${xhr.statusText}.`).show();
+                        $button.prop('disabled', false).text('Login');
+                    }
+                });
+            });
         });
-    });
-</script>
+    </script>
+</body>
+</html> 
