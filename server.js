@@ -10,22 +10,8 @@ const path = require('path');
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('cloudinary').v2;
-const winston = require('winston');
 
 const app = express();
-
-// Winston Logger
-const logger = winston.createLogger({
-    level: 'info',
-    format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-    ),
-    transports: [
-        new winston.transports.File({ filename: 'error.log', level: 'error' }),
-        new winston.transports.File({ filename: 'combined.log' })
-    ]
-});
 
 // Middleware
 app.use(cors({
@@ -53,15 +39,6 @@ app.use((req, res, next) => {
 
 // Request Logging
 app.use((req, res, next) => {
-    logger.info('Request', {
-        method: req.method,
-        url: req.url,
-        headers: {
-            'X-CSRF-Token': req.headers['x-csrf-token'],
-            Cookie: req.headers.cookie,
-            Authorization: req.headers.authorization ? 'Bearer <redacted>' : undefined
-        }
-    });
     console.log('Request:', {
         method: req.method,
         url: req.url,
@@ -86,7 +63,7 @@ const csrfProtection = csurf({
 });
 
 // Log Environment Variables
-logger.info('Environment variables', {
+console.log('Environment variables:', {
     MONGODB_URI: process.env.MONGODB_URI ? 'Set' : 'Missing',
     JWT_SECRET: process.env.JWT_SECRET ? 'Set' : 'Missing',
     EMAIL_USER: process.env.EMAIL_USER ? 'Set' : 'Missing',
@@ -103,9 +80,9 @@ try {
         api_key: process.env.CLOUDINARY_API_KEY,
         api_secret: process.env.CLOUDINARY_API_SECRET
     });
-    logger.info('Cloudinary configured successfully');
+    console.log('Cloudinary configured successfully');
 } catch (error) {
-    logger.error('Cloudinary config error', { error: error.message });
+    console.error('Cloudinary config error:', error);
 }
 
 // Configure Multer with Cloudinary Storage
@@ -121,12 +98,8 @@ const upload = multer({ storage });
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)
-    .then(() => {
-        logger.info('MongoDB connected', { database: mongoose.connection.db.databaseName });
-    })
-    .catch(err => {
-        logger.error('MongoDB connection error', { error: err.message });
-    });
+    .then(() => console.log('MongoDB connected', { database: mongoose.connection.db.databaseName }))
+    .catch(err => console.error('MongoDB connection error:', err));
 
 // Models
 const UserSchema = new mongoose.Schema({
@@ -200,36 +173,36 @@ try {
             pass: process.env.EMAIL_PASS
         }
     });
-    logger.info('Nodemailer configured successfully');
+    console.log('Nodemailer configured successfully');
 } catch (error) {
-    logger.error('Nodemailer config error', { error: error.message });
+    console.error('Nodemailer config error:', error);
 }
 
 // Middleware
 const authMiddleware = async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
-        logger.warn('Auth middleware: No token provided');
+        console.log('Auth middleware: No token provided');
         return res.status(401).json({ message: 'No token provided' });
     }
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        logger.info('Auth middleware: Token decoded', { userId: decoded.id });
+        console.log('Auth middleware: Token decoded', { userId: decoded.id });
         const user = await User.findById(decoded.id).select('-password');
         if (!user) {
-            logger.warn('Auth middleware: User not found', { userId: decoded.id });
+            console.log('Auth middleware: User not found', { userId: decoded.id });
             return res.status(401).json({ message: 'User not found' });
         }
         req.user = user;
         next();
     } catch (error) {
-        logger.error('JWT verification error', { error: error.message });
+        console.error('JWT verification error:', error);
         res.status(401).json({ message: 'Invalid token' });
     }
 };
 
 const adminMiddleware = (req, res, next) => {
-    logger.info('Admin middleware: Checking role', { role: req.user.role });
+    console.log('Admin middleware: Checking role', { role: req.user.role });
     if (req.user.role !== 'admin') {
         return res.status(403).json({ message: 'Admin access required' });
     }
@@ -239,19 +212,19 @@ const adminMiddleware = (req, res, next) => {
 // Routes
 app.get('/api/csrf-token', csrfProtection, (req, res) => {
     const token = req.csrfToken();
-    logger.info('CSRF token generated', { token, cookies: req.cookies });
+    console.log('CSRF token generated', { token, cookies: req.cookies });
     res.cookie('_csrf', token, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 3600 });
     res.json({ csrfToken: token });
 });
 
 app.post('/api/auth/register', csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for register');
+        console.log('CSRF token validated for register');
         const { name, email, password, phone } = req.body;
-        logger.info('Register attempt', { email });
+        console.log('Register attempt', { email });
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            logger.warn('User already exists', { email });
+            console.log('User already exists', { email });
             return res.status(400).json({ message: 'User already exists' });
         }
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -259,58 +232,58 @@ app.post('/api/auth/register', csrfProtection, async (req, res) => {
         await user.save();
         const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
         res.status(201).json({ token, user: { name, email, role: user.role, phone } });
-        logger.info('User registered', { email });
+        console.log('User registered', { email });
     } catch (error) {
-        logger.error('Register error', { error: error.message });
+        console.error('Register error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.post('/api/auth/login', csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for login', { 
+        console.log('CSRF token validated for login', { 
             tokenReceived: req.headers['x-csrf-token'],
             cookie: req.cookies._csrf
         });
         const { email, password } = req.body;
-        logger.info('Login attempt', { email });
+        console.log('Login attempt', { email });
         const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
         if (!user) {
-            logger.warn('Login failed: User not found', { email });
+            console.log('Login failed: User not found', { email });
             return res.status(400).json({ message: 'Invalid credentials' });
         }
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            logger.warn('Login failed: Password mismatch', { email });
+            console.log('Login failed: Password mismatch', { email });
             return res.status(400).json({ message: 'Invalid credentials' });
         }
         const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
         res.json({ token, user: { name: user.name, email, role: user.role, phone: user.phone } });
-        logger.info('User logged in', { email });
+        console.log('User logged in', { email });
     } catch (error) {
-        logger.error('Login error', { error: error.message });
+        console.error('Login error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.get('/api/auth/profile', authMiddleware, async (req, res) => {
     try {
-        logger.info('Profile request', { email: req.user.email });
+        console.log('Profile request', { email: req.user.email });
         res.json(req.user);
     } catch (error) {
-        logger.error('Profile error', { error: error.message });
+        console.error('Profile error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.post('/api/auth/forgot-password', csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for forgot-password');
+        console.log('CSRF token validated for forgot-password');
         const { email } = req.body;
-        logger.info('Forgot password request', { email });
+        console.log('Forgot password request', { email });
         const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
         if (!user) {
-            logger.warn('Forgot password: User not found', { email });
+            console.log('Forgot password: User not found', { email });
             return res.status(404).json({ message: 'User not found' });
         }
         const token = Math.random().toString(36).substring(2);
@@ -325,24 +298,24 @@ app.post('/api/auth/forgot-password', csrfProtection, async (req, res) => {
         };
         await transporter.sendMail(mailOptions);
         res.json({ message: 'Password reset email sent' });
-        logger.info('Password reset email sent', { email });
+        console.log('Password reset email sent', { email });
     } catch (error) {
-        logger.error('Forgot password error', { error: error.message });
+        console.error('Forgot password error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.post('/api/auth/reset-password', csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for reset-password');
+        console.log('CSRF token validated for reset-password');
         const { token, newPassword } = req.body;
-        logger.info('Reset password attempt', { token });
+        console.log('Reset password attempt', { token });
         const user = await User.findOne({
             resetPasswordToken: token,
             resetPasswordExpires: { $gt: Date.now() }
         });
         if (!user) {
-            logger.warn('Reset password: Invalid or expired token');
+            console.log('Reset password: Invalid or expired token');
             return res.status(400).json({ message: 'Invalid or expired token' });
         }
         user.password = await bcrypt.hash(newPassword, 10);
@@ -350,9 +323,9 @@ app.post('/api/auth/reset-password', csrfProtection, async (req, res) => {
         user.resetPasswordExpires = undefined;
         await user.save();
         res.json({ message: 'Password reset successful' });
-        logger.info('Password reset successful', { email: user.email });
+        console.log('Password reset successful', { email: user.email });
     } catch (error) {
-        logger.error('Reset password error', { error: error.message });
+        console.error('Reset password error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -361,9 +334,9 @@ app.get('/api/products', async (req, res) => {
     try {
         const products = await Product.find();
         res.json({ products });
-        logger.info('Products fetched', { count: products.length });
+        console.log('Products fetched', { count: products.length });
     } catch (error) {
-        logger.error('Get products error', { error: error.message });
+        console.error('Get products error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -372,28 +345,28 @@ app.get('/api/products/:id', async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
         if (!product) {
-            logger.warn('Product not found', { id: req.params.id });
+            console.log('Product not found', { id: req.params.id });
             return res.status(404).json({ message: 'Product not found' });
         }
         res.json(product);
-        logger.info('Product fetched', { name: product.name });
+        console.log('Product fetched', { name: product.name });
     } catch (error) {
-        logger.error('Get product error', { error: error.message });
+        console.error('Get product error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.post('/api/products', authMiddleware, adminMiddleware, csrfProtection, upload.single('image'), async (req, res) => {
     try {
-        logger.info('CSRF token validated for product addition');
+        console.log('CSRF token validated for product addition');
         const { name, description, price, brand, stock } = req.body;
-        logger.info('Add product attempt', { name, price, stock, description, brand, hasImage: !!req.file });
+        console.log('Add product attempt', { name, price, stock, description, brand, hasImage: !!req.file });
         if (!name || !price || !stock) {
-            logger.warn('Validation failed: Missing required fields', { name, price, stock });
+            console.log('Validation failed: Missing required fields', { name, price, stock });
             return res.status(400).json({ message: 'Name, price, and stock are required' });
         }
         if (isNaN(parseFloat(price)) || isNaN(parseInt(stock))) {
-            logger.warn('Validation failed: Invalid price or stock', { price, stock });
+            console.log('Validation failed: Invalid price or stock', { price, stock });
             return res.status(400).json({ message: 'Price and stock must be valid numbers' });
         }
         const image = req.file ? req.file.path : null;
@@ -407,24 +380,24 @@ app.post('/api/products', authMiddleware, adminMiddleware, csrfProtection, uploa
         });
         await newProduct.save();
         res.status(201).json(newProduct);
-        logger.info('Product added', { name });
+        console.log('Product added', { name });
     } catch (error) {
-        logger.error('Add product error', { error: error.message, stack: error.stack });
+        console.error('Add product error:', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.put('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection, upload.single('image'), async (req, res) => {
     try {
-        logger.info('CSRF token validated for product update');
+        console.log('CSRF token validated for product update');
         const { name, description, price, brand, stock } = req.body;
-        logger.info('Update product attempt', { id: req.params.id, name, price, stock, description, brand, hasImage: !!req.file });
+        console.log('Update product attempt', { id: req.params.id, name, price, stock, description, brand, hasImage: !!req.file });
         if (!name || !price || !stock) {
-            logger.warn('Validation failed: Missing required fields', { name, price, stock });
+            console.log('Validation failed: Missing required fields', { name, price, stock });
             return res.status(400).json({ message: 'Name, price, and stock are required' });
         }
         if (isNaN(parseFloat(price)) || isNaN(parseInt(stock))) {
-            logger.warn('Validation failed: Invalid price or stock', { price, stock });
+            console.log('Validation failed: Invalid price or stock', { price, stock });
             return res.status(400).json({ message: 'Price and stock must be valid numbers' });
         }
         const updateData = {
@@ -436,43 +409,43 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection, up
         };
         if (req.file) {
             updateData.image = req.file.path;
-            logger.info('Product image updated', { path: req.file.path });
+            console.log('Product image updated', { path: req.file.path });
         }
         const product = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true });
         if (!product) {
-            logger.warn('Product not found', { id: req.params.id });
+            console.log('Product not found', { id: req.params.id });
             return res.status(404).json({ message: 'Product not found' });
         }
         res.json(product);
-        logger.info('Product updated', { name });
+        console.log('Product updated', { name });
     } catch (error) {
-        logger.error('Update product error', { error: error.message, stack: error.stack });
+        console.error('Update product error:', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.delete('/api/products/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for product deletion');
-        logger.info('Delete product attempt', { id: req.params.id });
+        console.log('CSRF token validated for product deletion');
+        console.log('Delete product attempt', { id: req.params.id });
         const product = await Product.findByIdAndDelete(req.params.id);
         if (!product) {
-            logger.warn('Product not found', { id: req.params.id });
+            console.log('Product not found', { id: req.params.id });
             return res.status(404).json({ message: 'Product not found' });
         }
         res.json({ message: 'Product deleted' });
-        logger.info('Product deleted', { name: product.name });
+        console.log('Product deleted', { name: product.name });
     } catch (error) {
-        logger.error('Delete product error', { error: error.message, stack: error.stack });
+        console.error('Delete product error:', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.post('/api/orders', authMiddleware, csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for order creation');
+        console.log('CSRF token validated for order creation');
         const { items, total, shippingAddress } = req.body;
-        logger.info('Create order attempt', { email: req.user.email });
+        console.log('Create order attempt', { email: req.user.email });
         const orderId = `ORD${Date.now()}`;
         const order = new Order({
             orderId,
@@ -491,30 +464,30 @@ app.post('/api/orders', authMiddleware, csrfProtection, async (req, res) => {
         };
         await transporter.sendMail(mailOptions);
         res.status(201).json(order);
-        logger.info('Order created', { orderId });
+        console.log('Order created', { orderId });
     } catch (error) {
-        logger.error('Create order error', { error: error.message, stack: error.stack });
+        console.error('Create order error:', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.get('/api/orders', authMiddleware, async (req, res) => {
     try {
-        logger.info('Get orders', { email: req.user.email });
+        console.log('Get orders', { email: req.user.email });
         const orders = await Order.find({ userId: req.user._id }).populate('userId', 'name email');
         res.json(orders);
-        logger.info('Orders fetched', { count: orders.length });
+        console.log('Orders fetched', { count: orders.length });
     } catch (error) {
-        logger.error('Get orders error', { error: error.message });
+        console.error('Get orders error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.post('/api/repairs', csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for repair creation');
+        console.log('CSRF token validated for repair creation');
         const { userId, name, email, phone, deviceType, deviceModel, issue, contactMethod, preferredDate, image } = req.body;
-        logger.info('Create repair request', { email });
+        console.log('Create repair request', { email });
         const repairId = `REP${Date.now()}`;
         const repair = new Repair({
             userId,
@@ -538,37 +511,37 @@ app.post('/api/repairs', csrfProtection, async (req, res) => {
         };
         await transporter.sendMail(mailOptions);
         res.status(201).json(repair);
-        logger.info('Repair request created', { repairId });
+        console.log('Repair request created', { repairId });
     } catch (error) {
-        logger.error('Create repair error', { error: error.message, stack: error.stack });
+        console.error('Create repair error:', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        logger.info('Get admin orders', { email: req.user.email });
+        console.log('Get admin orders', { email: req.user.email });
         const orders = await Order.find().populate('userId', 'name email');
         res.json(orders);
-        logger.info('Admin orders fetched', { count: orders.length });
+        console.log('Admin orders fetched', { count: orders.length });
     } catch (error) {
-        logger.error('Get admin orders error', { error: error.message });
+        console.error('Get admin orders error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for order update');
+        console.log('CSRF token validated for order update');
         const { status } = req.body;
-        logger.info('Update order', { id: req.params.id });
+        console.log('Update order', { id: req.params.id });
         const order = await Order.findByIdAndUpdate(
             req.params.id,
             { status },
             { new: true }
         ).populate('userId', 'email');
         if (!order) {
-            logger.warn('Order not found', { id: req.params.id });
+            console.log('Order not found', { id: req.params.id });
             return res.status(404).json({ message: 'Order not found' });
         }
         const mailOptions = {
@@ -579,54 +552,54 @@ app.put('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtection
         };
         await transporter.sendMail(mailOptions);
         res.json(order);
-        logger.info('Order updated', { orderId: order.orderId });
+        console.log('Order updated', { orderId: order.orderId });
     } catch (error) {
-        logger.error('Update order error', { error: error.message, stack: error.stack });
+        console.error('Update order error:', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.delete('/api/admin/orders/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for order deletion');
-        logger.info('Delete order', { id: req.params.id });
+        console.log('CSRF token validated for order deletion');
+        console.log('Delete order', { id: req.params.id });
         const order = await Order.findByIdAndDelete(req.params.id);
         if (!order) {
-            logger.warn('Order not found', { id: req.params.id });
+            console.log('Order not found', { id: req.params.id });
             return res.status(404).json({ message: 'Order not found' });
         }
         res.json({ message: 'Order deleted' });
-        logger.info('Order deleted', { orderId: order.orderId });
+        console.log('Order deleted', { orderId: order.orderId });
     } catch (error) {
-        logger.error('Delete order error', { error: error.message, stack: error.stack });
+        console.error('Delete order error:', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.get('/api/admin/repairs', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        logger.info('Get admin repairs', { email: req.user.email });
+        console.log('Get admin repairs', { email: req.user.email });
         const repairs = await Repair.find().populate('userId', 'email');
         res.json(repairs);
-        logger.info('Admin repairs fetched', { count: repairs.length });
+        console.log('Admin repairs fetched', { count: repairs.length });
     } catch (error) {
-        logger.error('Get repairs error', { error: error.message });
+        console.error('Get repairs error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for repair update');
+        console.log('CSRF token validated for repair update');
         const { status } = req.body;
-        logger.info('Update repair', { id: req.params.id });
+        console.log('Update repair', { id: req.params.id });
         const repair = await Repair.findByIdAndUpdate(
             req.params.id,
             { status },
             { new: true }
         ).populate('userId', 'email');
         if (!repair) {
-            logger.warn('Repair not found', { id: req.params.id });
+            console.log('Repair not found', { id: req.params.id });
             return res.status(404).json({ message: 'Repair not found' });
         }
         const mailOptions = {
@@ -637,84 +610,84 @@ app.put('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtectio
         };
         await transporter.sendMail(mailOptions);
         res.json(repair);
-        logger.info('Repair updated', { repairId: repair.repairId });
+        console.log('Repair updated', { repairId: repair.repairId });
     } catch (error) {
-        logger.error('Update repair error', { error: error.message, stack: error.stack });
+        console.error('Update repair error:', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.delete('/api/admin/repairs/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for repair deletion');
-        logger.info('Delete repair', { id: req.params.id });
+        console.log('CSRF token validated for repair deletion');
+        console.log('Delete repair', { id: req.params.id });
         const repair = await Repair.findByIdAndDelete(req.params.id);
         if (!repair) {
-            logger.warn('Repair not found', { id: req.params.id });
+            console.log('Repair not found', { id: req.params.id });
             return res.status(404).json({ message: 'Repair not found' });
         }
         res.json({ message: 'Repair deleted' });
-        logger.info('Repair deleted', { repairId: repair.repairId });
+        console.log('Repair deleted', { repairId: repair.repairId });
     } catch (error) {
-        logger.error('Delete repair error', { error: error.message, stack: error.stack });
+        console.error('Delete repair error:', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        logger.info('Get admin users', { email: req.user.email });
+        console.log('Get admin users', { email: req.user.email });
         const users = await User.find().select('-password');
         res.json(users);
-        logger.info('Admin users fetched', { count: users.length });
+        console.log('Admin users fetched', { count: users.length });
     } catch (error) {
-        logger.error('Get users error', { error: error.message });
+        console.error('Get users error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.put('/api/admin/users/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for user update');
+        console.log('CSRF token validated for user update');
         const { name, email, phone, role } = req.body;
-        logger.info('Update user', { id: req.params.id });
+        console.log('Update user', { id: req.params.id });
         const user = await User.findByIdAndUpdate(
             req.params.id,
             { name, email, phone, role },
             { new: true }
         ).select('-password');
         if (!user) {
-            logger.warn('User not found', { id: req.params.id });
+            console.log('User not found', { id: req.params.id });
             return res.status(404).json({ message: 'User not found' });
         }
         res.json(user);
-        logger.info('User updated', { email: user.email });
+        console.log('User updated', { email: user.email });
     } catch (error) {
-        logger.error('Update user error', { error: error.message, stack: error.stack });
+        console.error('Update user error:', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, csrfProtection, async (req, res) => {
     try {
-        logger.info('CSRF token validated for user deletion');
-        logger.info('Delete user', { id: req.params.id });
+        console.log('CSRF token validated for user deletion');
+        console.log('Delete user', { id: req.params.id });
         const user = await User.findByIdAndDelete(req.params.id);
         if (!user) {
-            logger.warn('User not found', { id: req.params.id });
+            console.log('User not found', { id: req.params.id });
             return res.status(404).json({ message: 'User not found' });
         }
         res.json({ message: 'User deleted' });
-        logger.info('User deleted', { email: user.email });
+        console.log('User deleted', { email: user.email });
     } catch (error) {
-        logger.error('Delete user error', { error: error.message, stack: error.stack });
+        console.error('Delete user error:', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.get('/api/admin/analytics', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        logger.info('Get analytics', { email: req.user.email });
+        console.log('Get analytics', { email: req.user.email });
         const totalRevenue = await Order.aggregate([
             { $match: { status: 'Delivered' } },
             { $group: { _id: null, total: { $sum: '$total' } } }
@@ -724,17 +697,17 @@ app.get('/api/admin/analytics', authMiddleware, adminMiddleware, async (req, res
             totalRevenue: totalRevenue[0]?.total || 0,
             totalOrders
         });
-        logger.info('Analytics fetched', { totalRevenue: totalRevenue[0]?.total || 0, totalOrders });
+        console.log('Analytics fetched', { totalRevenue: totalRevenue[0]?.total || 0, totalOrders });
     } catch (error) {
-        logger.error('Analytics error', { error: error.message });
+        console.error('Analytics error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
-// CSRF Error Handler (must be after routes)
+// CSRF Error Handler
 app.use((err, req, res, next) => {
     if (err.code === 'EBADCSRFTOKEN') {
-        logger.error('CSRF Validation Error', {
+        console.error('CSRF Validation Error:', {
             message: err.message,
             tokenReceived: req.headers['x-csrf-token'],
             cookie: req.headers.cookie,
@@ -744,7 +717,7 @@ app.use((err, req, res, next) => {
         });
         return res.status(403).json({ message: 'Invalid CSRF token' });
     }
-    logger.error('Unexpected Error', {
+    console.error('Unexpected Error:', {
         message: err.message,
         stack: err.stack
     });
@@ -757,6 +730,4 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    logger.info(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
