@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const cookieParser = require('cookie-parser');
-const csrf = require('@tinyhttp/csurf');
+const csrf = require('csurf');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
@@ -673,7 +673,7 @@ app.delete('/api/admin/repairs/:id', authMiddleware, adminMiddleware, async (req
             cookie: req.cookies._csrf
         });
         console.log('Delete repair', { id: req.params.id });
-        const repair = await Product.findByIdAndDelete(req.params.id);
+        const repair = await Repair.findByIdAndDelete(req.params.id);
         if (!repair) {
             console.log('Repair not found', { id: req.params.id });
             return res.status(404).json({ message: 'Repair not found' });
