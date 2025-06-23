@@ -367,32 +367,45 @@
                 return;
             }
 
+            let csrfToken = null;
+
             // Fetch CSRF token with retry
-            function fetchCsrfToken(retries = 3, delay = 1000) {
-                $.ajax({
-                    url: '/api/csrf-token',
-                    method: 'GET',
-                    xhrFields: { withCredentials: true },
-                    success: function(response) {
-                        console.log('CSRF token fetched:', response.csrfToken);
-                        $('#csrfToken, #editCsrfToken, #editUserCsrfToken').val(response.csrfToken);
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('CSRF token fetch error:', {
-                            status: xhr.status,
-                            statusText: xhr.statusText,
-                            responseText: xhr.responseText || 'No response',
-                            error: error,
-                            retriesLeft: retries
-                        });
-                        if (retries > 0) {
-                            setTimeout(() => fetchCsrfToken(retries - 1, delay * 2), delay);
-                        } else {
-                            $('#errorAlert').text('Failed to load CSRF token. Please refresh.').show();
-                        }
+            async function fetchCsrfToken(retries = 3, delay = 1000) {
+                try {
+                    const response = await $.ajax({
+                        url: '/api/csrf-token',
+                        method: 'GET',
+                        xhrFields: { withCredentials: true }
+                    });
+                    csrfToken = response.csrfToken;
+                    console.log('CSRF token fetched:', csrfToken);
+                    $('#csrfToken, #editCsrfToken, #editUserCsrfToken').val(csrfToken);
+                    $('#addProductForm button[type="submit"]').prop('disabled', false);
+                } catch (xhr) {
+                    console.error('CSRF token fetch error:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        responseText: xhr.responseText || 'No response',
+                        retriesLeft: retries
+                    });
+                    if (xhr.status === 401) {
+                        localStorage.removeItem('token');
+                        $('#errorAlert').text('Session expired. Redirecting to login.').show();
+                        setTimeout(() => window.location.href = 'login.html', 1000);
+                        return;
                     }
-                });
+                    if (retries > 0) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        await fetchCsrfToken(retries - 1, delay * 2);
+                    } else {
+                        $('#errorAlert').text('Failed to load CSRF token: Server error. Please try again later.').show();
+                        $('#addProductForm button[type="submit"]').prop('disabled', true);
+                    }
+                }
             }
+
+            // Disable form until CSRF token is fetched
+            $('#addProductForm button[type="submit"]').prop('disabled', true);
             fetchCsrfToken();
 
             // Verify admin role
@@ -414,6 +427,51 @@
                     $('#errorAlert').text('Session expired. Please login again.').show();
                     localStorage.removeItem('token');
                     setTimeout(() => window.location.href = 'login.html', 1000);
+                }
+            });
+
+            // Add product
+            $('#addProductForm').submit(async function(e) {
+                e.preventDefault();
+                const $button = $(this).find('button[type="submit"]');
+                $button.prop('disabled', true).text('Adding Product...');
+                if (!csrfToken) {
+                    console.error('No CSRF token available');
+                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                    $button.prop('disabled', false).text('Add Product');
+                    return;
+                }
+                const formData = new FormData(this);
+                console.log('FormData contents:', [...formData.entries()]);
+                try {
+                    const response = await $.ajax({
+                        url: '/api/products',
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'X-CSRF-Token': csrfToken
+                        },
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        xhrFields: { withCredentials: true }
+                    });
+                    console.log('Product added successfully:', response);
+                    alert('Product added.');
+                    $('#addProductModal').modal('hide');
+                    $('#addProductForm')[0].reset();
+                    $button.prop('disabled', false).text('Add Product');
+                    await fetchCsrfToken(); // Refresh token
+                    loadProducts();
+                } catch (xhr) {
+                    console.error('Add product error:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        responseText: xhr.responseText || 'No response',
+                        error: xhr.responseJSON?.message
+                    });
+                    $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
+                    $button.prop('disabled', false).text('Add Product');
                 }
             });
 
@@ -641,53 +699,6 @@
                 });
             }
 
-            // Add product
-            $('#addProductForm').submit(function(e) {
-                e.preventDefault();
-                const $button = $(this).find('button[type="submit"]');
-                $button.prop('disabled', true).text('Adding Product...');
-                const csrfToken = $('#csrfToken').val();
-                console.log('Add product form submitted', { csrfToken });
-                if (!csrfToken) {
-                    console.error('No CSRF token available');
-                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
-                    $button.prop('disabled', false).text('Add Product');
-                    return;
-                }
-                const formData = new FormData(this);
-                formData.append('_csrf', csrfToken);
-                console.log('FormData contents:', [...formData.entries()]);
-                $.ajax({
-                    url: '/api/products',
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': csrfToken
-                    },
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        console.log('Product added successfully:', response);
-                        alert('Product added.');
-                        $('#addProductModal').modal('hide');
-                        $('#addProductForm')[0].reset();
-                        $button.prop('disabled', false).text('Add Product');
-                        loadProducts();
-                    },
-                    error: function(xhr) {
-                        console.error('Add product error:', {
-                            status: xhr.status,
-                            statusText: xhr.statusText,
-                            responseText: xhr.responseText || 'No response',
-                            error: xhr.responseJSON?.message
-                        });
-                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
-                        $button.prop('disabled', false).text('Add Product');
-                    }
-                });
-            });
-
             // Edit product
             $(document).on('click', '.edit-product', function() {
                 $('#editProductId').val($(this).data('id'));
@@ -699,13 +710,11 @@
                 $('#editProductModal').modal('show');
             });
 
-            $('#editProductForm').submit(function(e) {
+            $('#editProductForm').submit(async function(e) {
                 e.preventDefault();
                 const $button = $(this).find('button[type="submit"]');
                 $button.prop('disabled', true).text('Updating Product...');
                 const productId = $('#editProductId').val();
-                const csrfToken = $('#editCsrfToken').val();
-                console.log('Edit product form submitted', { productId, csrfToken });
                 if (!csrfToken) {
                     console.error('No CSRF token available');
                     $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
@@ -713,45 +722,43 @@
                     return;
                 }
                 const formData = new FormData(this);
-                formData.append('_csrf', csrfToken);
                 console.log('FormData contents:', [...formData.entries()]);
-                $.ajax({
-                    url: `/api/products/${productId}`,
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': csrfToken
-                    },
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        console.log('Product updated successfully:', response);
-                        alert('Product updated.');
-                        $('#editProductModal').modal('hide');
-                        $('#editProductForm')[0].reset();
-                        $button.prop('disabled', false).text('Update Product');
-                        loadProducts();
-                    },
-                    error: function(xhr) {
-                        console.error('Edit product error:', {
-                            status: xhr.status,
-                            statusText: xhr.statusText,
-                            responseText: xhr.responseText || 'No response',
-                            error: xhr.responseJSON?.message
-                        });
-                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
-                        $button.prop('disabled', false).text('Update Product');
-                    }
-                });
+                try {
+                    const response = await $.ajax({
+                        url: `/api/products/${productId}`,
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'X-CSRF-Token': csrfToken
+                        },
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        xhrFields: { withCredentials: true }
+                    });
+                    console.log('Product updated successfully:', response);
+                    alert('Product updated.');
+                    $('#editProductModal').modal('hide');
+                    $('#editProductForm')[0].reset();
+                    $button.prop('disabled', false).text('Update Product');
+                    await fetchCsrfToken(); // Refresh token
+                    loadProducts();
+                } catch (xhr) {
+                    console.error('Edit product error:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        responseText: xhr.responseText || 'No response',
+                        error: xhr.responseJSON?.message
+                    });
+                    $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
+                    $button.prop('disabled', false).text('Update Product');
+                }
             });
 
             // Delete product
             $(document).on('click', '.delete-product', function() {
-                if (!confirm('Are you sure you want to delete this product?')) return;
+                if (!confirm('Are you sure you want to flag this product for deletion?')) return;
                 const productId = $(this).data('id');
-                const csrfToken = $('#csrfToken').val();
-                console.log('Delete product attempt', { productId, csrfToken });
                 if (!csrfToken) {
                     console.error('No CSRF token available');
                     $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
@@ -767,7 +774,7 @@
                     data: { _csrf: csrfToken },
                     success: function(response) {
                         console.log('Product deleted:', response);
-                        alert('Product deleted.');
+                        alert('Product flagged for deletion.');
                         $(`[data-id="${productId}"]`).remove();
                     },
                     error: function(xhr) {
@@ -788,8 +795,6 @@
                 const status = $(this).val();
                 const isOrder = $(this).hasClass('order-status');
                 const endpoint = isOrder ? 'orders' : 'repairs';
-                const csrfToken = $('#csrfToken').val();
-                console.log(`Updating ${endpoint} status:`, { id, status, csrfToken });
                 if (!csrfToken) {
                     console.error('No CSRF token available');
                     $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
@@ -830,8 +835,6 @@
             $(document).on('click', '.delete-order', function() {
                 if (!confirm('Are you sure you want to delete this order?')) return;
                 const orderId = $(this).data('id');
-                const csrfToken = $('#csrfToken').val();
-                console.log('Delete order attempt', { orderId, csrfToken });
                 if (!csrfToken) {
                     console.error('No CSRF token available');
                     $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
@@ -867,8 +870,6 @@
             $(document).on('click', '.delete-repair', function() {
                 if (!confirm('Are you sure you want to delete this repair?')) return;
                 const repairId = $(this).data('id');
-                const csrfToken = $('#csrfToken').val();
-                console.log('Delete repair attempt', { repairId, csrfToken });
                 if (!csrfToken) {
                     console.error('No CSRF token available');
                     $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
@@ -894,10 +895,10 @@
                             responseText: xhr.responseText || 'No response',
                             error: xhr.responseJSON?.message
                         });
-                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
+                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message?. 'Server error')).show();
                     }
                 });
-            });
+            }
 
             // Edit user
             $(document).on('click', '.edit-user', function() {
@@ -909,27 +910,26 @@
                 $('#editUserModal').modal('show');
             });
 
-            $('#editUserForm').submit(function(e) {
+            $('#editUserForm').submit(async function(e) {
                 e.preventDefault();
-                const $button = $(this).find('button[type="submit"]');
-                $button.prop('disabled', true).text('Updating User...');
-                const userId = $('#editUserId').val();
-                const csrfToken = $('#editUserCsrfToken').val();
-                console.log('Edit user form submitted', { userId, csrfToken });
-                if (!csrfToken) {
-                    console.error('No CSRF token available');
-                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
-                    $button.prop('disabled', false).text('Update User');
-                    return;
-                }
-                const userData = {
-                    name: $('#editUserName').val(),
-                    email: $('#editUserEmail').val(),
-                    phone: $('#editUserPhone').val(),
-                    role: $('#editUserRole').val(),
-                    _csrf: csrfToken
-                };
-                $.ajax({
+            const $button = $(this).find('button[type="submit"]');
+            $button.prop('disabled', true).text('Updating User...'));
+            const userId = $('#editUserId').val();
+            if (!csrfToken) {
+                console.error('No CSRF token available');
+                $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                $button.prop('disabled', false).text('Update User');
+                return;
+            }
+            const userData = {
+                name: $('#editUserName').val(),
+                email: $('#editUserEmail').val(),
+                phone: $('#editUserPhone').val(),
+                role: $('#editUserRole').val(),
+                _csrf: csrfToken
+            };
+            try {
+                const response = await $.ajax({
                     url: `/api/admin/users/${userId}`,
                     method: 'PUT',
                     headers: {
@@ -937,180 +937,74 @@
                         'X-CSRF-Token': csrfToken
                     },
                     contentType: 'application/json',
-                    data: JSON.stringify(userData),
-                    success: function(response) {
-                        console.log('User updated successfully:', response);
-                        alert('User updated.');
-                        $('#editUserModal').modal('hide');
-                        $('#editUserForm')[0].reset();
-                        $button.prop('disabled', false).text('Update User');
-                        loadUsers();
-                    },
-                    error: function(xhr) {
-                        console.error('Edit user error:', {
-                            status: xhr.status,
-                            statusText: xhr.statusText,
-                            responseText: xhr.responseText || 'No response',
-                            error: xhr.responseJSON?.message
-                        });
-                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
-                        $button.prop('disabled', false).text('Update User');
-                    }
+                    data: JSON.stringify(userData)
                 });
-            });
-
-            // Delete user
-            $(document).on('click', '.delete-user', function() {
-                if (!confirm('Are you sure you want to delete this user?')) return;
-                const userId = $(this).data('id');
-                const csrfToken = $('#csrfToken').val();
-                console.log('Delete user attempt', { userId, csrfToken });
-                if (!csrfToken) {
-                    console.error('No CSRF token available');
-                    $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
-                    return;
-                }
-                $.ajax({
-                    url: `/api/admin/users/${userId}`,
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': csrfToken
-                    },
-                    data: { _csrf: csrfToken },
-                    success: function(response) {
-                        console.log('User deleted:', response);
-                        alert('User deleted.');
-                        $(`[data-id="${userId}"]`).remove();
-                    },
-                    error: function(xhr) {
-                        console.error('Delete user error:', {
-                            status: xhr.status,
-                            statusText: xhr.statusText,
-                            responseText: xhr.responseText || 'No response',
-                            error: xhr.responseJSON?.message
-                        });
-                        $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
-                    }
-<script>
-    $(document).ready(function() {
-        // Loader
-        $('body').addClass('loader-active');
-        setTimeout(() => {
-            $('#loader').addClass('hidden');
-            $('body').removeClass('loader-active');
-        }, 2000);
-
-        // Authentication check
-        const token = localStorage.getItem('token');
-        if (!token) {
-            $('#errorAlert').text('Please login as an admin to access this page.').show();
-            setTimeout(() => window.location.href = 'login.html', 1000);
-            return;
-        }
-
-        let csrfToken = null;
-
-        // Fetch CSRF token with retry
-        async function fetchCsrfToken(retries = 3, delay = 1000) {
-            try {
-                const response = await $.ajax({
-                    url: '/api/csrf-token',
-                    method: 'GET',
-                    xhrFields: { withCredentials: true }
-                });
-                csrfToken = response.csrfToken;
-                console.log('CSRF token fetched:', csrfToken);
-                $('#csrfToken, #editCsrfToken, #editUserCsrfToken').val(csrfToken);
-                $('#addProductForm button[type="submit"]').prop('disabled', false); // Enable form
+                console.log('User updated successfully:', response);
+                alert('User updated.');
+                $('#editUserModal').modal('hide');
+                $('#editUserForm')[0].reset();
+                $button.prop('disabled', false).text('Update User');
+                loadUsers();
             } catch (xhr) {
-                console.error('CSRF token fetch error:', {
-                    status: xhr.status,
-                    statusText: xhr.statusText,
-                    responseText: xhr.responseText || 'No response',
-                    retriesLeft: retries
-                });
-                if (retries > 0) {
-                    setTimeout(() => fetchCsrfToken(retries - 1, delay * 2), delay);
-                } else {
-                    $('#errorAlert').text('Failed to load CSRF token. Please refresh.').show();
-                    $('#addProductForm button[type="submit"]').prop('disabled', true);
-                }
-            }
-        }
-
-        // Disable form until CSRF token is fetched
-        $('#addProductForm button[type="submit"]').prop('disabled', true);
-        fetchCsrfToken();
-
-        // Verify admin role
-        $.ajax({
-            url: '/api/auth/profile',
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` },
-            success: function(user) {
-                if (user.role !== 'admin') {
-                    $('#errorAlert').text('Access denied. Admin privileges required.').show();
-                    localStorage.removeItem('token');
-                    setTimeout(() => window.location.href = 'index.html', 1000);
-                    return;
-                }
-                console.log('Admin verified:', user.email);
-            },
-            error: function(xhr) {
-                console.error('Profile error:', xhr.responseJSON?.message || 'Server error');
-                $('#errorAlert').text('Session expired. Please login again.').show();
-                localStorage.removeItem('token');
-                setTimeout(() => window.location.href = 'login.html', 1000);
-            }
-        });
-
-        // Add product
-        $('#addProductForm').submit(async function(e) {
-            e.preventDefault();
-            const $button = $(this).find('button[type="submit"]');
-            $button.prop('disabled', true).text('Adding Product...');
-            if (!csrfToken) {
-                console.error('No CSRF token available');
-                $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
-                $button.prop('disabled', false).text('Add Product');
-                return;
-            }
-            const formData = new FormData(this);
-            console.log('FormData contents:', [...formData.entries()]);
-            try {
-                const response = await $.ajax({
-                    url: '/api/products',
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'X-CSRF-Token': csrfToken
-                    },
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    xhrFields: { withCredentials: true }
-                });
-                console.log('Product added successfully:', response);
-                alert('Product added.');
-                $('#addProductModal').modal('hide');
-                $('#addProductForm')[0].reset();
-                $button.prop('disabled', false).text('Add Product');
-                await fetchCsrfToken(); // Refresh token
-                loadProducts();
-            } catch (xhr) {
-                console.error('Add product error:', {
+                console.error('Edit user error:', {
                     status: xhr.status,
                     statusText: xhr.statusText,
                     responseText: xhr.responseText || 'No response',
                     error: xhr.responseJSON?.message
                 });
                 $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
-                $button.prop('disabled', false).text('Add Product');
+                $button.prop('disabled', false).text('Update User');
             }
         });
 
-        // ... (Other functions: loadOrders, loadRepairs, loadProducts, loadUsers, loadAnalytics, edit/delete handlers unchanged)
-    </script>
+        // Delete user
+        $(document).on('click', '.delete-user', function() {
+            if (!confirm('Are you sure you want to delete this user?')) return;
+            const userId = $(this).data('id');
+            if (!csrfToken) {
+                console.error('No CSRF token available');
+                $('#errorAlert').text('CSRF token not loaded. Please refresh.').show();
+                return;
+            }
+            $.ajax({
+                url: `/api/admin/users/${userId}`,
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'X-CSRF-Token': csrfToken
+                },
+                data: { _csrf: csrfToken },
+                success: function(response) {
+                    console.log('User deleted:', response);
+                    alert('User deleted.');
+                    $(`[data-id="${userId}"]`).remove();
+                },
+                error: function(xhr) {
+                    console.error('Delete user error:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        responseText: xhr.responseText || 'No response',
+                        error: xhr.responseJSON?.message
+                    });
+                    $('#errorAlert').text('Error: ' + (xhr.responseJSON?.message || 'Server error')).show();
+                }
+            });
+        });
+
+        // Logout
+        $('#logout').click(function(e) {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            window.location.href = 'index.html';
+        });
+
+        // Load initial data
+        loadOrders();
+        loadRepairs();
+        loadProducts();
+        loadUsers();
+        loadAnalytics();
+    });
+</script>
 </body>
-</html>
+</html> 
